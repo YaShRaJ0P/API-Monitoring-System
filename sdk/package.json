@@ -1,8 +1,9 @@
 {
   "name": "monito-api",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Express middleware SDK for tracking API metrics with the API Monitoring System",
   "main": "index.js",
+  "type": "module",
   "keywords": [
     "api",
     "monitoring",
