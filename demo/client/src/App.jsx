@@ -14,7 +14,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-const API_BASE = import.meta.env.SERVER_URI;
+const API_BASE = import.meta.env.VITE_APP_SERVER_URI;
 
 //  Helpers
 
@@ -45,7 +45,7 @@ export default function App() {
   const [setup, setSetup] = useState({
     apiKey: "",
     apiSecret: "",
-    monitorUrl: import.meta.env.BASE_URI,
+    monitorUrl: import.meta.env.VITE_APP_BASE_URI,
   });
   const [setupErr, setSetupErr] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
