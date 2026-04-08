@@ -14,10 +14,11 @@ WORKDIR /app
 
 # Only install production dependencies in the final image
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
-# Copy source (tsx runs TypeScript directly)
+# copy runtime files
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/tsconfig.json ./
 
 EXPOSE 3000

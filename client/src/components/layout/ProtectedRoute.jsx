@@ -1,6 +1,6 @@
 import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
-import { Activity } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 /**
  * Protects routes that require authentication.
@@ -13,15 +13,9 @@ export function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 animate-pulse">
-          <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center">
-            <Activity className="size-8 text-primary" />
-          </div>
-          <p className="text-muted-foreground text-sm font-medium">
-            Loading...
-          </p>
-        </div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <Loader2 className="size-7 text-cyan-500 animate-spin mb-4" />
+        <p className="text-muted-foreground text-sm font-medium">Loading...</p>
       </div>
     );
   }

@@ -4,8 +4,6 @@
  * Provides functions for bucketing timestamps into time intervals
  * for metric aggregation in the API monitoring system.
  *
- * For example, to aggregate latency data per minute, you can
- * bucket all timestamps in a given minute to the start of that minute.
  */
 
 export type BucketGranularity = "1m" | "5m" | "15m" | "1h" | "1d";
@@ -26,10 +24,8 @@ const GRANULARITY_MS: Record<BucketGranularity, number> = {
  * @returns A new Date representing the start of the bucket
  *
  * @example
- * ```ts
  * toBucket(new Date("2026-02-16T01:23:45Z"), "5m")
  * // → Date("2026-02-16T01:20:00Z")
- * ```
  */
 export function toBucket(timestamp: Date | string, granularity: BucketGranularity): Date {
     const ms = typeof timestamp === "string" ? new Date(timestamp).getTime() : timestamp.getTime();

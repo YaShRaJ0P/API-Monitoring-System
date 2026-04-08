@@ -11,6 +11,9 @@ export const TIME_RANGES = {
     "24h": { label: "Last 24 hours", hours: 24 },
     "7d": { label: "Last 7 days", hours: 168 },
     "30d": { label: "Last 30 days", hours: 720 },
+    "90d": { label: "Last 3 months", hours: 2160 },
+    "180d": { label: "Last 6 months", hours: 4320 },
+    "365d": { label: "Last 1 year", hours: 8760 },
 };
 
 /**
@@ -22,8 +25,8 @@ export function computeDateRange(rangeKey) {
     const now = new Date();
     const hours = TIME_RANGES[rangeKey]?.hours || 24;
     return {
-        startDate: formatISO(subHours(now, hours)),
-        endDate: formatISO(now),
+        startDate: subHours(now, hours).toISOString(),
+        endDate: now.toISOString(),
     };
 }
 

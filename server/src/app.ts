@@ -10,8 +10,9 @@ import { AuthRoutes } from "./modules/auth/auth.route.js"
 import { IngestionRouter } from "./modules/ingestion/ingestion.route.js"
 import { TenantRoutes } from "./modules/tenant/tenant.route.js"
 import { MetricsRoutes } from "./modules/metrics/metrics.route.js"
-import { alertsRouter } from "./modules/alerts/alerts.route.js"
-import { dlqRouter } from "./modules/dlq/dlq.route.js"
+import { AlertRoutes } from "./modules/alerts/alerts.route.js"
+import { DLQRoutes } from "./modules/dlq/dlq.route.js"
+import { AdminRoutes } from "./modules/admin/admin.route.js"
 import configurePassport from "./modules/auth/passport.js"
 import { AuthRepository } from "./modules/auth/auth.repository.js"
 import { AuthService } from "./modules/auth/auth.service.js"
@@ -19,7 +20,10 @@ import { DataBaseConfig, MongoDB, PostgreSQL, Redis } from "./config/db/index.js
 import { RabbitMQ } from "./config/rabbitmq.js"
 import { errorMiddleware } from "./shared/middleware/error.middleware.js"
 import { authMiddleware } from "./shared/middleware/auth.middleware.js"
-import { globalLimiter, authLimiter, ingestLimiter } from "./shared/middleware/rateLimiter.middleware.js"
+import { isAdminMiddleware } from "./shared/middleware/isAdmin.middleware.js"
+import { apiKeyMiddleware } from "./shared/middleware/apiKey.middleware.js"
+import { globalLimiter } from "./shared/middleware/rateLimiter.middleware.js"
+import { apiKeyLimiter } from "./shared/middleware/apiKeyRateLimit.middleware.js"
 
 /**
  * Creates and configures the Express application.
@@ -27,7 +31,7 @@ import { globalLimiter, authLimiter, ingestLimiter } from "./shared/middleware/r
 export function createApp() {
     const app = express();
 
-    // ───── Core Middleware ─────
+    // ------ Core Middleware ------
     app.use(cors(config.cors))
     app.use(express.json({ limit: "10mb" }))
     app.use(express.urlencoded({ extended: true, limit: "10mb" }))
@@ -35,7 +39,7 @@ export function createApp() {
     app.use(cookieParser())
     app.use(globalLimiter)
 
-    // Session middleware for passport (uses dedicated session secret)
+    // Session middleware
     app.use(session({
         secret: config.session.secret,
         resave: false,
@@ -49,16 +53,15 @@ export function createApp() {
     app.use(passport.initialize())
     app.use(passport.session())
 
-    // ───── Shared DI — single instances used by both Passport and Auth routes ─────
     const pool = DataBaseConfig.getPostgresPool();
     const authRepo = new AuthRepository(pool);
     const authService = new AuthService(authRepo);
     configurePassport(passport, authService, authRepo);
 
 
-    // ───── Public routes ─────
+    // ------ Public routes ------
     app.get("/", (req, res) => {
-        response(res, 200, "Hello World!", null)
+        response(res, 200, "API Monitoring System", null)
     })
 
     app.get("/health", async (req, res) => {
@@ -88,7 +91,12 @@ export function createApp() {
         if (checks.rabbitmq !== "connected") allHealthy = false;
 
         const statusCode = allHealthy ? 200 : 503;
-        response(res, statusCode, allHealthy ? "All services healthy" : "Some services are unhealthy", {
+        response(res, statusCode, allHealthy ? "All services healthy" : `
+            Postgres : ${checks.postgres.toUpperCase()}
+            MongoDB : ${checks.mongo.toUpperCase()}
+            Redis : ${checks.redis.toUpperCase()}
+            RabbitMQ : ${checks.rabbitmq.toUpperCase()}
+            `, {
             status: allHealthy ? "healthy" : "degraded",
             services: checks,
             uptime: process.uptime(),
@@ -96,17 +104,18 @@ export function createApp() {
         });
     })
 
-    // Auth routes (login, callback are public; me/refresh/logout use auth middleware inside)
-    app.use(config.api.prefix + "/" + config.api.version + "/auth", authLimiter, AuthRoutes({ authService }))
+    // Auth routes
+    app.use(config.api.prefix + "/" + config.api.version + "/auth", AuthRoutes({ authService }))
 
-    // ───── Protected routes ─────
+    // ------ Protected routes ------
     app.use(config.api.prefix + "/" + config.api.version + "/tenant", authMiddleware, TenantRoutes({ postgresPool: pool }))
-    app.use(config.api.prefix + "/" + config.api.version + "/ingest", authMiddleware, ingestLimiter, IngestionRouter())
+    app.use(config.api.prefix + "/" + config.api.version + "/ingest", apiKeyMiddleware, apiKeyLimiter, IngestionRouter())
     app.use(config.api.prefix + "/" + config.api.version + "/metrics", authMiddleware, MetricsRoutes({ postgresPool: pool }))
-    app.use(config.api.prefix + "/" + config.api.version + "/alerts", authMiddleware, alertsRouter)
-    app.use(config.api.prefix + "/" + config.api.version + "/admin/dlq", authMiddleware, dlqRouter)
+    app.use(config.api.prefix + "/" + config.api.version + "/alerts", authMiddleware, AlertRoutes())
+    app.use(config.api.prefix + "/" + config.api.version + "/admin/dlq", authMiddleware, isAdminMiddleware, DLQRoutes({ postgresPool: pool }))
+    app.use(config.api.prefix + "/" + config.api.version + "/admin", authMiddleware, isAdminMiddleware, AdminRoutes())
 
-    // ───── Error handler (MUST be last) ─────
+    // ------ Error handler
     app.use(errorMiddleware)
 
     return app;

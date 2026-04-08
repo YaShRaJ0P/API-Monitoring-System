@@ -1,36 +1,67 @@
 import type { Pool } from "pg";
-import type { ITenant } from "./tenant.entity.js";
+import type { ITenant, IProject } from "./tenant.entity.js";
 
+import crypto from "crypto";
+import { encryptSecret, decryptSecret } from "../../shared/utils/crypto.js";
+
+/**
+ * Repository for tenant and project database operations.
+ * Handles project CRUD and tenant lookups via PostgreSQL.
+ */
 export class TenantRepository {
     constructor(private readonly pool: Pool) { }
 
     /**
-     * Generates and assigns a new env_id (API key) for an existing tenant.
-     * @param {string} id - Tenant UUID
-     * @param {string} envId - The generated env_id (API key)
-     * @returns {ITenant | null} Updated tenant or null if not found
+     * Creates a new project for the given tenant.
+     * @param {string} tenantId - Tenant UUID
+     * @param {string} name - Project name
+     * @returns {Promise<IProject>} Created project with env_id
      */
-    async assignApiKey({ id, envId }: { id: string, envId: string }): Promise<ITenant | null> {
-        const result = await this.pool.query<ITenant>(
-            `UPDATE tenants 
-             SET env_id = $2, updated_at = NOW() 
-             WHERE id = $1
+    async createProject(tenantId: string, name: string): Promise<IProject> {
+        const rawSecret   = crypto.randomBytes(32).toString('hex');
+        const storedSecret = encryptSecret(rawSecret);
+
+        console.log("[DEBUG] Secret Length, : ", storedSecret.length);
+
+        const result = await this.pool.query<IProject>(
+            `INSERT INTO projects (tenant_id, name, api_secret)
+             VALUES ($1, $2, $3)
              RETURNING *`,
-            [id, envId]
+            [tenantId, name, storedSecret]
         );
-        return result.rows[0] ?? null;
+
+        const project = result.rows[0]!;
+        project.api_secret = rawSecret;
+        return project;
     }
 
     /**
-     * Finds a tenant by their env_id (API key).
-     * @param {string} envId - Environment ID / API key
-     * @returns {ITenant | null} Matching tenant or null
+     * Lists all projects for a tenant.
+     * @param {string} tenantId - Tenant UUID
+     * @returns {Promise<IProject[]>} Array of projects
      */
-    async findByEnvId(envId: string): Promise<ITenant | null> {
-        const result = await this.pool.query<ITenant>(
-            `SELECT * FROM tenants WHERE env_id = $1`,
-            [envId]
+    async listProjects(tenantId: string): Promise<IProject[]> {
+        const result = await this.pool.query<IProject>(
+            `SELECT * FROM projects WHERE tenant_id = $1 ORDER BY created_at DESC`,
+            [tenantId]
         );
-        return result.rows[0] ?? null;
+        return result.rows.map(p => ({
+            ...p,
+            api_secret: decryptSecret(p.api_secret)
+        }));
+    }
+
+    /**
+     * Deletes a project by id, scoped to tenant for security.
+     * @param {string} id - Internal project UUID
+     * @param {string} tenantId - Tenant UUID (ownership check)
+     * @returns {Promise<boolean>} True if deleted
+     */
+    async deleteProject(id: string, tenantId: string): Promise<boolean> {
+        const result = await this.pool.query(
+            `DELETE FROM projects WHERE id = $1 AND tenant_id = $2`,
+            [id, tenantId]
+        );
+        return (result.rowCount ?? 0) > 0;
     }
 }

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { AuthRequest } from "../types/auth.types.js";
 import { verifyAccessToken } from "../utils/jwt.js";
 import { AppError } from "../errors/AppError.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Protects routes by validating the Bearer access token.
@@ -34,7 +35,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
         (req as AuthRequest).user = {
             id: decoded.id,
             email: decoded.email,
-            tenant_id: decoded.id // Assuming tenant_id is same as user id for now or extracted
+            tenant_id: decoded.id
         };
         next();
     } catch (error) {

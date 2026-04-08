@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IRawEvent extends Document {
     event_id: string;
     tenant_id: string;
+    project_id: string;
     endpoint: string;
     method: string;
     status: number;
@@ -17,6 +18,7 @@ export interface IRawEvent extends Document {
 const RawEventSchema: Schema = new Schema({
     event_id: { type: String, required: true, unique: true },
     tenant_id: { type: String, required: true, index: true },
+    project_id: { type: String, required: true, index: true },
     endpoint: { type: String, required: true },
     method: { type: String, required: true },
     status: { type: Number, required: true },
@@ -29,6 +31,7 @@ const RawEventSchema: Schema = new Schema({
 });
 
 // Indexes for common queries
+RawEventSchema.index({ project_id: 1, timestamp: -1 });
 RawEventSchema.index({ tenant_id: 1, timestamp: -1 });
 RawEventSchema.index({ service: 1, environment: 1 });
 

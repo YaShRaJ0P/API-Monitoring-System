@@ -6,6 +6,8 @@
  * In production, debug logs are suppressed.
  */
 
+import { config } from "../../config/config";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogEntry {
@@ -25,14 +27,14 @@ const LOG_LEVELS: Record<LogLevel, number> = {
     error: 3,
 };
 
-const currentLevel: LogLevel = (process.env.LOG_LEVEL as LogLevel) || (process.env.NODE_ENV === "production" ? "info" : "debug");
+const currentLevel: LogLevel = (config.LOG_LEVEL as LogLevel) || (config.NODE_ENV === "production" ? "info" : "debug");
 
 function shouldLog(level: LogLevel): boolean {
     return LOG_LEVELS[level] >= LOG_LEVELS[currentLevel];
 }
 
 function formatEntry(entry: LogEntry): string {
-    if (process.env.NODE_ENV === "production") {
+    if (config.NODE_ENV === "production") {
         return JSON.stringify(entry);
     }
 
@@ -90,7 +92,7 @@ function log(level: LogLevel, message: string, context?: string, data?: unknown,
             break;
         case "error":
             console.error(formatted);
-            if (entry.stack && process.env.NODE_ENV !== "production") {
+            if (entry.stack && config.NODE_ENV !== "production") {
                 console.error(entry.stack);
             }
             break;
@@ -101,11 +103,9 @@ function log(level: LogLevel, message: string, context?: string, data?: unknown,
  * Creates a named logger instance with a fixed context.
  * 
  * @example
- * ```ts
- * const logger = createLogger("RabbitMQ");
- * logger.info("Connected");              // INFO [RabbitMQ] Connected
- * logger.error("Failed", { url }, err);  // ERROR [RabbitMQ] Failed {"url":"..."} | Error: ...
- * ```
+ * 
+ * const log = createLogger("RabbitMQ");
+ * 
  */
 export function createLogger(context: string) {
     return {

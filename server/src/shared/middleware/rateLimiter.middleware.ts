@@ -1,30 +1,36 @@
 import rateLimit from "express-rate-limit";
 import { createLogger } from "../utils/logger.js";
 
-const log = createLogger("RateLimiter");
+const log = createLogger("IpRateLimiter");
 
 /**
- * Global API rate limiter — applies to all routes.
- * Limits each IP to 100 requests per 15-minute window.
+ * Global API rate limiter - applied to every route.
+ * Limits each IP to 1 000 requests per 15-minute rolling window.
+ * Generous enough to not interfere with the admin dashboard's auto-polling.
  */
 export const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 15 * 60 * 1000, // 15 min
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
         success: false,
-        message: "Too many requests, please try again later.",
+        message: "Too many requests from this IP, please try again later.",
     },
-    handler: (req, res, next, options) => {
-        log.warn(`Rate limit exceeded for IP: ${req.ip}`);
+    handler: (req, res, _next, options) => {
+        log.warn(`Global rate limit exceeded for IP: ${req.ip}`);
         res.status(429).json(options.message);
+    },
+    skip: (req) => {
+        if (req.path === "/health") return true;
+        if (req.path.includes("/ingest")) return true;
+
+        return false;
     },
 });
 
 /**
- * Strict rate limiter for auth routes (login, token refresh).
- * Limits each IP to 20 requests per 15-minute window.
+ * Strict limiter for authentication routes
  */
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -34,20 +40,5 @@ export const authLimiter = rateLimit({
     message: {
         success: false,
         message: "Too many authentication attempts, please try again later.",
-    },
-});
-
-/**
- * Strict rate limiter for ingestion endpoint.
- * Limits each IP to 500 requests per minute.
- */
-export const ingestLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 500,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        message: "Ingestion rate limit exceeded.",
     },
 });

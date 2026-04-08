@@ -2,14 +2,12 @@ import axios from "axios";
 
 /**
  * In-memory access token storage.
- * Kept outside of Redux to avoid circular dependencies
- * (interceptors need the token but shouldn't import the store).
  */
 let accessToken = null;
 
 /**
  * Sets the in-memory access token.
- * @param {string|null} token - JWT access token
+ * @param {string|null} token
  */
 export const setAccessToken = (token) => {
     accessToken = token;
@@ -24,7 +22,7 @@ export const getAccessToken = () => accessToken;
 /**
  * Axios instance pre-configured for the API.
  * - BaseURL from env or defaults to localhost:3000
- * - Credentials (cookies) sent with every request
+ * - Credentials (cookies) sent with every request for refresh-token flow
  */
 const client = axios.create({
     baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1",
@@ -32,11 +30,23 @@ const client = axios.create({
     headers: { "Content-Type": "application/json" },
 });
 
-// ─── Request Interceptor ─────────────────────────────────
-// Attaches the Bearer token to every outgoing request.
+let refreshTokenPromise = null;
+
+export const executeRefreshToken = () => {
+    if (!refreshTokenPromise) {
+        refreshTokenPromise = client.post("/auth/refresh-token").finally(() => {
+            refreshTokenPromise = null;
+        });
+    }
+    return refreshTokenPromise;
+};
+
+// ---- Request Interceptor -------------
+// Attaches the in-memory Bearer token to every outgoing request.
 client.interceptors.request.use(
     (config) => {
         const token = getAccessToken();
+
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -45,10 +55,10 @@ client.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// ─── Response Interceptor ────────────────────────────────
-// On 401, attempts a silent token refresh using the httpOnly cookie.
-// If refresh succeeds, retries the original request.
-// If refresh fails, redirects to /login.
+// ---- Response Interceptor ---------------
+// On 401, attempts a silent token refresh using the httpOnly refresh cookie.
+// If refresh succeeds, retries the original request with the new token.
+// If refresh fails, clears the token and redirects to /login.
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -64,7 +74,12 @@ const processQueue = (error, token = null) => {
 };
 
 client.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        if (!response.data.success) {
+            return Promise.reject(response.data);
+        }
+        return response.data;
+    },
     async (error) => {
         const originalRequest = error.config;
 
@@ -88,8 +103,9 @@ client.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const { data } = await client.post("/auth/refresh-token");
-                const newToken = data.data?.accessToken;
+                // Response interceptor already unwraps response payload
+                const res = await executeRefreshToken();
+                const newToken = res.data?.accessToken;
 
                 if (newToken) {
                     setAccessToken(newToken);

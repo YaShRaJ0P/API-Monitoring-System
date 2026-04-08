@@ -11,6 +11,7 @@ const log = createLogger("Redis");
  */
 export class Redis {
     private static client: RedisClientType | null = null;
+    private static retryCount = 0;
 
     /**
      * Establishes a Redis connection.
@@ -43,6 +44,14 @@ export class Redis {
             return this.client;
         } catch (error) {
             log.error("Redis connection failed", undefined, error instanceof Error ? error : undefined);
+            const delay = Math.min(1000 * Math.pow(2, this.retryCount), 30000);
+
+            if (this.retryCount < 10) {
+                log.error(`Connection failed, retrying in ${delay}ms...`, { attempt: this.retryCount + 1 });
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return this.connect();
+            }
+
             throw new AppError(500, "Redis connection failed", error);
         }
     }

@@ -4,47 +4,63 @@ import type { AuthRequest } from "../../shared/types/auth.types.js";
 import response from "../../shared/utils/response.js";
 import { TenantService } from "./tenant.service.js";
 
-
-/**
- * Controller for tenant management routes.
- * Handles API key generation and tenant lookups.
- */
 export class TenantController {
     constructor(private readonly tenantService: TenantService) { }
 
     /**
-     * Creates/regenerates an API key (env_id) for the authenticated tenant.
+     * Creates a new project for the authenticated tenant.
      * @param {AuthRequest} req - Express request with authenticated user ID
      * @param {Response} res - Express response
      * @param {NextFunction} next - Express next function
      */
-    createApiKey = async (req: Request, res: Response, next: NextFunction) => {
+    createProject = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
-            const id = (req as AuthRequest).id;
-            if (!id) {
+            const tenantId = req.id;
+            if (!tenantId) {
                 throw new AppError(401, "Unauthorized");
             }
-            const tenant = await this.tenantService.createApiKey(id);
-            response(res, 200, "API key generated successfully", { env_id: tenant.env_id });
+            const { name } = req.body;
+            const project = await this.tenantService.createProject(tenantId, name);
+            response(res, 201, "Project created successfully", project);
         } catch (error) {
             next(error);
         }
     }
 
     /**
-     * Retrieves tenant info by API key (x-api-key header).
-     * @param {Request} req - Express request with x-api-key header
+     * Lists all projects for the authenticated tenant.
+     * @param {AuthRequest} req - Express request with authenticated user ID
      * @param {Response} res - Express response
      * @param {NextFunction} next - Express next function
      */
-    getTenant = async (req: Request, res: Response, next: NextFunction) => {
+    listProjects = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
-            const envId = req.headers["x-api-key"] as string;
-            if (!envId) {
-                throw new AppError(400, "x-api-key header is required");
+            const tenantId = req.id;
+            if (!tenantId) {
+                throw new AppError(401, "Unauthorized");
             }
-            const tenant = await this.tenantService.getTenant(envId);
-            response(res, 200, "OK", tenant);
+            const projects = await this.tenantService.listProjects(tenantId);
+            response(res, 200, "OK", projects);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * Deletes a project by id for the authenticated tenant.
+     * @param {AuthRequest} req - Express request with project id in params
+     * @param {Response} res - Express response
+     * @param {NextFunction} next - Express next function
+     */
+    deleteProject = async (req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            const tenantId = req.id;
+            if (!tenantId) {
+                throw new AppError(401, "Unauthorized");
+            }
+            const id = req.params.id as string;
+            await this.tenantService.deleteProject(id, tenantId);
+            response(res, 200, "Project deleted successfully", null);
         } catch (error) {
             next(error);
         }

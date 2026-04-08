@@ -2,13 +2,6 @@ import { Component } from "react";
 
 /**
  * React Error Boundary component.
- * Catches JavaScript errors in child components and renders a fallback UI
- * instead of crashing the entire application.
- *
- * Usage: Wrap around any component tree in App.jsx or page-level components.
- * <ErrorBoundary>
- *   <MyComponent />
- * </ErrorBoundary>
  */
 export class ErrorBoundary extends Component {
   constructor(props) {

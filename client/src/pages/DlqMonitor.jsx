@@ -31,21 +31,34 @@ import * as dlqApi from "@/api/dlq.api";
 
 /**
  * DLQ monitoring page. Shows failed outbox entries with replay capabilities.
- * Outbox entries fail when they exceed MAX_ATTEMPTS during projection to PostgreSQL.
+ * Outbox entries fail when they exceed MAX_ATTEMPTS during projection.
  */
 export default function DlqMonitor() {
   const [page, setPage] = useState(1);
   const [replayAllOpen, setReplayAllOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // ─── Queries ───
-  const { data: statsData, isLoading: statsLoading } = useQuery({
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["dlq-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["dlq-entries"] });
+  };
+
+  // ---- Queries ----
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    isFetching: statsFetching,
+  } = useQuery({
     queryKey: ["dlq-stats"],
     queryFn: dlqApi.getDlqStats,
     refetchInterval: 15000,
   });
 
-  const { data: entriesData, isLoading: entriesLoading } = useQuery({
+  const {
+    data: entriesData,
+    isLoading: entriesLoading,
+    isFetching: entriesFetching,
+  } = useQuery({
     queryKey: ["dlq-entries", page],
     queryFn: () => dlqApi.getDlqEntries({ page, limit: 15 }),
     staleTime: 5000,
@@ -55,7 +68,7 @@ export default function DlqMonitor() {
   const totalPages = entriesData?.totalPages || 1;
   const total = entriesData?.total || 0;
 
-  // ─── Mutations ───
+  // ---- Mutations ----
   const replayOneMutation = useMutation({
     mutationFn: dlqApi.replayDlqEntry,
     onSuccess: () => {
@@ -76,25 +89,25 @@ export default function DlqMonitor() {
   const STAT_CARDS = [
     {
       label: "Pending",
-      value: statsData?.pending ?? "—",
+      value: statsData?.pending ?? "-",
       icon: Clock,
       color: "text-blue-500 bg-blue-500/10",
     },
     {
       label: "Processed",
-      value: statsData?.processed ?? "—",
+      value: statsData?.processed ?? "-",
       icon: CheckCircle2,
       color: "text-emerald-500 bg-emerald-500/10",
     },
     {
       label: "Failed",
-      value: statsData?.failed ?? "—",
+      value: statsData?.failed ?? "-",
       icon: XCircle,
       color: "text-red-500 bg-red-500/10",
     },
     {
       label: "Total",
-      value: statsData?.total ?? "—",
+      value: statsData?.total ?? "-",
       icon: RefreshCw,
       color: "text-violet-500 bg-violet-500/10",
     },
@@ -103,7 +116,7 @@ export default function DlqMonitor() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
             Dead Letter Queue
@@ -112,15 +125,26 @@ export default function DlqMonitor() {
             Monitor and replay failed outbox projection entries.
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          disabled={total === 0}
-          onClick={() => setReplayAllOpen(true)}
-        >
-          <RotateCcw className="size-4" />
-          Replay All
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleRefresh}>
+            <RefreshCw
+              className={cn(
+                "size-4",
+                (statsFetching || entriesFetching) && "animate-spin",
+              )}
+            />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={total === 0}
+            onClick={() => setReplayAllOpen(true)}
+          >
+            <RotateCcw className="size-4" />
+            Replay All
+          </Button>
+        </div>
       </div>
 
       {/* Stat Cards */}
@@ -206,7 +230,7 @@ export default function DlqMonitor() {
                         </Badge>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground max-w-[300px] truncate">
-                        {entry.lastError || "—"}
+                        {entry.lastError || "-"}
                       </td>
                       <td className="p-3 text-right">
                         <Button

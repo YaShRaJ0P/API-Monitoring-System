@@ -7,10 +7,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { initializeAuth } from "@/store/slices/authSlice";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { OnboardingGuard } from "@/components/layout/OnboardingGuard";
+import { ProjectLayout } from "@/components/layout/ProjectLayout";
 import { Shell } from "@/components/layout/Shell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-// ─── Pages ───
+// ---- Pages ----
 import Login from "@/pages/Login";
 import LoginSuccess from "@/pages/LoginSuccess";
 import Onboarding from "@/pages/Onboarding";
@@ -20,7 +21,8 @@ import Alerts from "@/pages/Alerts";
 import Logs from "@/pages/Logs";
 import Integration from "@/pages/Integration";
 import Settings from "@/pages/Settings";
-import DlqMonitor from "@/pages/DlqMonitor";
+import AdminPanel from "@/pages/Admin";
+import ProjectRedirect from "@/pages/ProjectRedirect";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,12 +37,23 @@ const queryClient = new QueryClient({
  * Root application component.
  * Sets up providers (React Query, Tooltip, Toaster),
  * initializes auth on mount, and defines all routes.
+ *
+ * Route hierarchy:
+ *   /                   → ProjectRedirect (picks first project, navigates to /:name/dashboard)
+ *   /:projectName/*     → ProjectLayout (URL ↔ Redux bridge) → Shell → page
+ *   /onboarding         → Onboarding (no shell, protected)
+ *   /login              → Login
+ *   /login/success      → LoginSuccess
  */
 export default function App() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    dispatch(initializeAuth());
+    // Only run silent refresh if we're not landing on the auth callback,
+    // which handles its own initialization via handleOAuthCallback race-free.
+    if (!window.location.pathname.startsWith("/login/success")) {
+      dispatch(initializeAuth());
+    }
   }, [dispatch]);
 
   return (
@@ -49,11 +62,11 @@ export default function App() {
         <TooltipProvider>
           <Toaster richColors position="top-right" />
           <Routes>
-            {/* ─── Public Routes ─── */}
+            {/* ---- Public Routes ---- */}
             <Route path="/login" element={<Login />} />
             <Route path="/login/success" element={<LoginSuccess />} />
 
-            {/* ─── Onboarding (protected, no sidebar) ─── */}
+            {/* ---- Onboarding (protected, no shell) ---- */}
             <Route
               path="/onboarding"
               element={
@@ -63,93 +76,91 @@ export default function App() {
               }
             />
 
-            {/* ─── App Routes (protected + onboarding guard + sidebar) ─── */}
+            {/* ---- Project-scoped app routes ---- */}
+            <Route
+              path="/:projectName"
+              element={
+                <ProtectedRoute>
+                  <OnboardingGuard>
+                    <ProjectLayout />
+                  </OnboardingGuard>
+                </ProtectedRoute>
+              }
+            >
+              {/* Default: /:projectName → /:projectName/dashboard */}
+              <Route index element={<Navigate to="dashboard" replace />} />
+
+              <Route
+                path="dashboard"
+                element={
+                  <Shell>
+                    <Dashboard />
+                  </Shell>
+                }
+              />
+              <Route
+                path="services"
+                element={
+                  <Shell>
+                    <Services />
+                  </Shell>
+                }
+              />
+              <Route
+                path="alerts"
+                element={
+                  <Shell>
+                    <Alerts />
+                  </Shell>
+                }
+              />
+              <Route
+                path="logs"
+                element={
+                  <Shell>
+                    <Logs />
+                  </Shell>
+                }
+              />
+              <Route
+                path="integration"
+                element={
+                  <Shell>
+                    <Integration />
+                  </Shell>
+                }
+              />
+              <Route
+                path="settings"
+                element={
+                  <Shell>
+                    <Settings />
+                  </Shell>
+                }
+              />
+              <Route
+                path="admin"
+                element={
+                  <Shell>
+                    <AdminPanel />
+                  </Shell>
+                }
+              />
+            </Route>
+
+            {/* ---- Root redirect → first project's dashboard ---- */}
             <Route
               path="/"
               element={
                 <ProtectedRoute>
                   <OnboardingGuard>
-                    <Shell>
-                      <Dashboard />
-                    </Shell>
-                  </OnboardingGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/services"
-              element={
-                <ProtectedRoute>
-                  <OnboardingGuard>
-                    <Shell>
-                      <Services />
-                    </Shell>
-                  </OnboardingGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/alerts"
-              element={
-                <ProtectedRoute>
-                  <OnboardingGuard>
-                    <Shell>
-                      <Alerts />
-                    </Shell>
-                  </OnboardingGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/logs"
-              element={
-                <ProtectedRoute>
-                  <OnboardingGuard>
-                    <Shell>
-                      <Logs />
-                    </Shell>
-                  </OnboardingGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/integration"
-              element={
-                <ProtectedRoute>
-                  <OnboardingGuard>
-                    <Shell>
-                      <Integration />
-                    </Shell>
-                  </OnboardingGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <OnboardingGuard>
-                    <Shell>
-                      <Settings />
-                    </Shell>
-                  </OnboardingGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/dlq"
-              element={
-                <ProtectedRoute>
-                  <OnboardingGuard>
-                    <Shell>
-                      <DlqMonitor />
-                    </Shell>
+                    <ProjectRedirect />
                   </OnboardingGuard>
                 </ProtectedRoute>
               }
             />
 
-            {/* Catch-all */}
+            {/* ---- Catch-all ---- */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </TooltipProvider>

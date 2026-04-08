@@ -1,13 +1,9 @@
 import { z } from "zod";
 
-/**
- * Zod schemas for request body validation across API endpoints.
- * Used by the validate middleware to enforce data contracts.
- */
-
-// ─── Alert Rules ───
+// ---- Alert Rules ----
 
 export const createAlertRuleSchema = z.object({
+    project_id: z.uuidv4("Invalid project ID"),
     name: z.string().min(1, "Name is required").max(100),
     metric: z.enum(["error_rate", "latency", "request_count"]),
     condition: z.enum([">", "<"]),
@@ -16,6 +12,7 @@ export const createAlertRuleSchema = z.object({
     window_minutes: z.number().int().min(1).max(1440).default(5),
     cooldown_minutes: z.number().int().min(1).max(1440).default(60),
     enabled: z.boolean().default(true),
+    send_email: z.boolean().default(false),
 });
 
 export const updateAlertRuleSchema = z.object({
@@ -27,17 +24,18 @@ export const updateAlertRuleSchema = z.object({
     window_minutes: z.number().int().min(1).max(1440).optional(),
     cooldown_minutes: z.number().int().min(1).max(1440).optional(),
     enabled: z.boolean().optional(),
+    send_email: z.boolean().optional(),
 });
 
-// ─── Ingestion ───
+// ---- Ingestion ----
 
 export const ingestEventSchema = z.object({
-    service: z.string().min(1, "Service name is required").max(100),
-    endpoint: z.string().min(1, "Endpoint is required").max(500),
-    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]),
-    status_code: z.number().int().min(100).max(599),
-    latency: z.number().min(0, "Latency must be non-negative"),
-    timestamp: z.string().optional(),
-    error: z.string().max(2000).optional(),
-    metadata: z.record(z.string(), z.unknown()).optional(),
+    service:     z.string().min(1, "Service name is required").max(100),
+    endpoint:    z.string().min(1, "Endpoint is required").max(500),
+    method:      z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]),
+    status:      z.number().int().min(100).max(599),
+    latency:     z.number().min(0, "Latency must be non-negative"),
+    timestamp:   z.string().datetime().optional(),
+    environment: z.string().min(1, "Environment is required").max(100),
+    error:       z.string().max(2000).nullable().optional(),
 });

@@ -12,6 +12,7 @@ const log = createLogger("MongoDB");
 export class MongoDB {
     private static instance: typeof mongoose | null = null;
     private static connectionPromise: Promise<typeof mongoose> | null = null;
+    private static retryCount: number = 0;
 
     /**
      * Establishes a MongoDB connection (safe for concurrent calls).
@@ -50,6 +51,14 @@ export class MongoDB {
                 return mongooseInstance;
             } catch (error) {
                 this.reset();
+                const delay = Math.min(1000 * Math.pow(2, this.retryCount), 30000);
+
+                if (this.retryCount < 10) {
+                    log.error(`Connection failed, retrying in ${delay}ms...`, { attempt: this.retryCount + 1 });
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return this.connect();
+                }
+
                 log.error("MongoDB connection failed", undefined, error instanceof Error ? error : undefined);
                 throw new AppError(500, "MongoDB connection failed", error);
             } finally {
@@ -67,7 +76,7 @@ export class MongoDB {
      */
     static getInstance(): typeof mongoose {
         if (!this.instance) {
-            throw new AppError(500, "MongoDB not initialized. Call connect() first.");
+            throw new AppError(500, "MongoDB not initialized.");
         }
 
         return this.instance;

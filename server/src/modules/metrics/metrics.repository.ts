@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { createLogger } from "../../shared/utils/logger.js";
 import RawEvent from "../../models/RawEvent.js";
 import type { MetricsQuery } from "./metrics.validator.js";
+import { AppError } from "../../shared/errors/AppError.js";
 
 const log = createLogger("MetricsRepository");
 
@@ -14,20 +15,18 @@ const log = createLogger("MetricsRepository");
 function buildWhereClause(
     filters: MetricsQuery,
     startIdx: number,
+    timeCol: string = "hour_bucket"
 ): { clause: string; values: unknown[] } {
+
     const conditions: string[] = [];
     const values: unknown[] = [];
     let idx = startIdx;
 
-    conditions.push(`tenant_id = $${idx}`);
-    // tenant_id is added by the caller — starting placeholder
-    idx++;
-
-    conditions.push(`hour_bucket >= $${idx}`);
+    conditions.push(`${timeCol} >= $${idx}`);
     values.push(filters.startDate);
     idx++;
 
-    conditions.push(`hour_bucket <= $${idx}`);
+    conditions.push(`${timeCol} <= $${idx}`);
     values.push(filters.endDate);
     idx++;
 
@@ -61,14 +60,14 @@ function buildWhereClause(
     };
 }
 
-// ── Result types ────────────────────────────────────────────────────
+// -- Result types ---------------
 
 export interface OverviewResult {
     total_requests: number;
     avg_latency: number;
     error_rate: number;
+    max_latency: number;
     p95_latency: number;
-    p99_latency: number;
     success_count: number;
     error_count: number;
 }
@@ -118,122 +117,140 @@ export class MetricsRepository {
     /**
      * Returns high-level dashboard overview stats.
      * @param {string} tenantId - Tenant UUID
-     * @param {MetricsQuery} filters - Validated query parameters
-     * @returns {Promise<OverviewResult>} Aggregated overview
-     */
-    /**
-     * Returns high-level dashboard overview stats.
      * Aggregates data from `hourly_metrics` table.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<OverviewResult>} Aggregated overview
      */
-    async getOverview(tenantId: string, filters: MetricsQuery): Promise<OverviewResult> {
-        const { clause, values } = buildWhereClause(filters, 2);
+    async getOverview(tenantId: string, projectId: string, filters: MetricsQuery): Promise<OverviewResult> {
+        const { clause, values } = buildWhereClause(filters, 3);
+
 
         const query = `
             SELECT
-                COALESCE(SUM(total_requests), 0)::int                   AS total_requests,
-                COALESCE(
-                    ROUND(SUM(total_latency) / NULLIF(SUM(total_requests), 0)),
-                    0
-                )::int                                                  AS avg_latency,
-                COALESCE(
-                    ROUND(100.0 * SUM(failure_count) / NULLIF(SUM(total_requests), 0), 2),
-                    0
-                )::float                                                AS error_rate,
-                0                                                       AS p95_latency, -- Not available in pre-aggregated
-                0                                                       AS p99_latency, -- Not available in pre-aggregated
-                COALESCE(SUM(success_count), 0)::int                    AS success_count,
-                COALESCE(SUM(failure_count), 0)::int                    AS error_count
-            FROM hourly_metrics
-            WHERE ${clause}
+            COALESCE(SUM(total_requests), 0)::int AS total_requests,
+            COALESCE(ROUND(SUM(total_latency) / NULLIF(SUM(total_requests), 0)), 0)::int AS avg_latency,
+            COALESCE(ROUND(100.0 * SUM(failure_count) / NULLIF(SUM(total_requests), 0), 2), 0)::float AS error_rate,
+            COALESCE(MAX(max_latency), 0)::int AS max_latency,
+            COALESCE(SUM(success_count), 0)::int AS success_count,
+            COALESCE(SUM(failure_count), 0)::int AS error_count,
+            COALESCE(
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY total_latency / NULLIF(total_requests,0)),
+                0
+            )::int AS p95_latency
+        FROM hourly_metrics
+        WHERE project_id = $1
+          AND tenant_id = $2
+          AND ${clause};
+
         `;
 
-        const result = await this.pool.query<OverviewResult>(query, [tenantId, ...values]);
-        log.debug("Overview query executed", { tenantId });
+        const result = await this.pool.query<OverviewResult>(query, [projectId, tenantId, ...values]);
+
         return result.rows[0]!;
     }
 
     /**
      * Returns time-bucketed request counts and latency for charting.
-     * Uses `hourly_metrics` regardless of requested granularity for simplicity in this iteration,
-     * but queries can be adjusted to use minute_metrics for short ranges if needed.
+     * Uses `hourly_metrics` regardless of requested granularity for simplicity in this iteration.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters (includes granularity)
      * @returns {Promise<TimeseriesBucket[]>} Array of time buckets
      */
-    async getTimeseries(tenantId: string, filters: MetricsQuery): Promise<TimeseriesBucket[]> {
-        const { clause, values } = buildWhereClause(filters, 2);
+    async getTimeseries(
+        tenantId: string,
+        projectId: string,
+        filters: MetricsQuery
+    ): Promise<TimeseriesBucket[]> {
 
-        // We use the same granularityLogic to bucket the already-bucketed hourly data if user asks for 1d
-        // Note: For <1h granularity, this will return repeated hourly values if we query hourly_metrics.
-        // Ideally, we switch table based on granularity. For now, we stick to hourly_metrics as per Week 4 plan (Analytics).
+        const gran = filters.granularity || "1h";
+
+        // 🔥 1. Parse
+        const { value, unit } = this.parseGranularity(gran);
+
+        this.validateGranularityRange(filters, value, unit);
+
+        // 🔥 2. Resolve table
+        const { table, column } = this.resolveStorage(unit, value);
+
+        // 🔥 3. Build bucket expression
+        const bucketExpr = this.buildBucketExpr(column, value, unit);
+
+        const { clause, values } = buildWhereClause(filters, 3, column);
 
         const query = `
-            SELECT
-                date_trunc('minute', hour_bucket) -
-                    (EXTRACT(MINUTE FROM hour_bucket)::int % ${this.granularityMinutes(filters.granularity)} || ' minutes')::interval
-                    AS bucket,
-                SUM(total_requests)::int                               AS request_count,
-                COALESCE(
-                    ROUND(SUM(total_latency) / NULLIF(SUM(total_requests), 0)),
-                    0
-                )::int                                                 AS avg_latency,
-                SUM(failure_count)::int                                AS error_count
-            FROM hourly_metrics
-            WHERE ${clause}
-            GROUP BY bucket
-            ORDER BY bucket ASC
-        `;
+        SELECT
+            ${bucketExpr} AS bucket,
+            SUM(total_requests)::int AS request_count,
+            COALESCE(
+                ROUND(SUM(total_latency) / NULLIF(SUM(total_requests), 0)),
+                0
+            )::int AS avg_latency,
+            SUM(failure_count)::int AS error_count
+        FROM ${table}
+        WHERE project_id = $1 
+          AND tenant_id = $2 
+          AND ${clause}
+        GROUP BY 1
+        ORDER BY 1 ASC
+    `;
 
-        const result = await this.pool.query<TimeseriesBucket>(query, [tenantId, ...values]);
-        log.debug("Timeseries query executed", { tenantId, granularity: filters.granularity });
+        const result = await this.pool.query<TimeseriesBucket>(
+            query,
+            [projectId, tenantId, ...values]
+        );
+
         return result.rows;
     }
 
     /**
      * Returns per-endpoint performance breakdown.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<EndpointStat[]>} Endpoint stats
      */
-    async getEndpointStats(tenantId: string, filters: MetricsQuery): Promise<EndpointStat[]> {
-        const { clause, values } = buildWhereClause(filters, 2);
+    async getEndpointStats(tenantId: string, projectId: string, filters: MetricsQuery): Promise<EndpointStat[]> {
+        const { clause, values } = buildWhereClause(filters, 3);
 
         const query = `
-            SELECT
-                endpoint,
-                method,
-                SUM(total_requests)::int                               AS total_requests,
-                COALESCE(
-                    ROUND(SUM(total_latency) / NULLIF(SUM(total_requests), 0)),
-                    0
-                )::int                                                 AS avg_latency,
-                COALESCE(
-                    ROUND(100.0 * SUM(failure_count) / NULLIF(SUM(total_requests), 0), 2),
-                    0
-                )::float                                               AS error_rate,
-                0                                                      AS p95_latency
-            FROM hourly_metrics
-            WHERE ${clause}
-            GROUP BY endpoint, method
-            ORDER BY total_requests DESC
-        `;
+        SELECT
+            endpoint,
+            method,
+            SUM(total_requests)::int AS total_requests,
+            COALESCE(
+                ROUND(SUM(total_latency) / NULLIF(SUM(total_requests), 0)),
+                0
+            )::int AS avg_latency,
+            COALESCE(
+                ROUND(100.0 * SUM(failure_count) / NULLIF(SUM(total_requests), 0), 2),
+                0
+            )::float AS error_rate,
+            COALESCE(
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY total_latency / NULLIF(total_requests,0)),
+                0
+            )::int AS p95_latency
+        FROM hourly_metrics
+        WHERE project_id = $1 AND tenant_id = $2 AND ${clause}
+        GROUP BY endpoint, method
+        ORDER BY total_requests DESC;
+    `;
 
-        const result = await this.pool.query<EndpointStat>(query, [tenantId, ...values]);
-        log.debug("Endpoint stats query executed", { tenantId });
+        const result = await this.pool.query<EndpointStat>(query, [projectId, tenantId, ...values]);
         return result.rows;
     }
 
     /**
      * Returns per-service summary.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<ServiceStat[]>} Service stats
      */
-    async getServiceStats(tenantId: string, filters: MetricsQuery): Promise<ServiceStat[]> {
-        const { clause, values } = buildWhereClause(filters, 2);
+    async getServiceStats(tenantId: string, projectId: string, filters: MetricsQuery): Promise<ServiceStat[]> {
+        const { clause, values } = buildWhereClause(filters, 3);
 
         const query = `
             SELECT
@@ -248,40 +265,37 @@ export class MetricsRepository {
                     0
                 )::float                                               AS error_rate
             FROM hourly_metrics
-            WHERE ${clause}
+            WHERE project_id = $1 AND tenant_id = $2 AND ${clause}
             GROUP BY service
             ORDER BY total_requests DESC
         `;
 
-        const result = await this.pool.query<ServiceStat>(query, [tenantId, ...values]);
-        log.debug("Service stats query executed", { tenantId });
+        const result = await this.pool.query<ServiceStat>(query, [projectId, tenantId, ...values]);
         return result.rows;
     }
 
     /**
-     * Returns paginated raw metric logs.
-     * @param {string} tenantId - Tenant UUID
-     * @param {MetricsQuery} filters - Validated query parameters (includes page/limit)
-     * @returns {Promise<{ data: MetricLog[], total: number }>} Paginated results
-     */
-    /**
      * Returns paginated raw metric logs from MongoDB.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters (includes page/limit)
      * @returns {Promise<{ data: MetricLog[], total: number }>} Paginated results
      */
     async getLogs(
         tenantId: string,
+        projectId: string,
         filters: MetricsQuery,
     ): Promise<{ data: MetricLog[]; total: number }> {
         const query: any = {
             tenant_id: tenantId,
+            project_id: projectId,
             timestamp: { $gte: new Date(filters.startDate), $lte: new Date(filters.endDate) },
         };
 
         if (filters.service) query.service = filters.service;
         if (filters.environment) query.environment = filters.environment;
-        if (filters.endpoint) query.endpoint = filters.endpoint;
+        if (filters.endpoint) query.endpoint = { $regex: filters.endpoint, $options: "i" };
+        if (filters.errorOnly) query.status = { $gte: 400 };
         if (filters.method) query.method = filters.method;
 
         const skip = (filters.page - 1) * filters.limit;
@@ -301,29 +315,108 @@ export class MetricsRepository {
             environment: e.environment,
             endpoint: e.endpoint,
             method: e.method,
-            status_code: e.status, // Model has 'status', interface has 'status_code'
+            status_code: e.status,
             latency: e.latency,
             error: e.error || null,
             timestamp: e.timestamp.toISOString(),
         }));
 
-        log.debug("Logs query executed (MongoDB)", { tenantId, page: filters.page });
         return { data, total };
+    }
+
+
+    private validateGranularityRange(filters: MetricsQuery, value: number, unit: 'm' | 'h' | 'd' | 'w' | 'y') {
+        const rangeMs =
+            new Date(filters.endDate).getTime() -
+            new Date(filters.startDate).getTime();
+
+        if (rangeMs <= 0) {
+            throw new AppError(400, "Invalid time range");
+        }
+
+        const maxPoints = 1000; // safe limit
+
+        const unitToMs: Record<'m' | 'h' | 'd' | 'w' | 'y', number> = {
+            m: 60_000,
+            h: 3_600_000,
+            d: 86_400_000,
+            w: 604_800_000,
+            y: 31_536_000_000
+        };
+
+        const bucketMs = value * unitToMs[unit];
+        const points = rangeMs / bucketMs;
+
+        if (points > maxPoints) {
+            throw new AppError(
+                400,
+                `Reduce time range.`
+            );
+        }
     }
 
     /**
      * Maps granularity string to minute divisor for date_trunc bucketing.
-     * @param {string} granularity - Bucket size key
-     * @returns {number} Minute interval
+     * @param {string} gran - Granularity string (e.g., "1m", "1h", "1d", "1w", "1y")
+     * @returns {{ value: number, unit: string }} Minute interval
      */
-    private granularityMinutes(granularity: string): number {
-        const map: Record<string, number> = {
-            "1m": 1,
-            "5m": 5,
-            "15m": 15,
-            "1h": 60,
-            "1d": 1440,
+    private parseGranularity(gran: string): { value: number, unit: 'm' | 'h' | 'd' | 'w' | 'y' } {
+        const match = gran.match(/^(\d+)([mhdwy])$/);
+        if (!match) throw new AppError(400, "Invalid granularity");
+
+        return {
+            value: parseInt(match[1] as string, 10),
+            unit: match[2] as 'm' | 'h' | 'd' | 'w' | 'y'
         };
-        return map[granularity] || 60;
+    }
+
+    /**
+     * Resolves the storage table and column based on the granularity unit.
+     * @param {string} unit - Granularity unit (m, h, d, w, y)
+     * @returns {{ table: string, column: string }} Storage table and column
+     */
+    private resolveStorage(unit: string, value: number) {
+        // Use minute table for anything < 1h precision
+        if (unit === 'm') {
+            return {
+                table: "minute_metrics",
+                column: "minute_bucket"
+            };
+        }
+
+        return {
+            table: "hourly_metrics",
+            column: "hour_bucket"
+        };
+    }
+
+    /**
+     * Builds the bucket expression for date_trunc bucketing.
+     * @param {string} column - Column name
+     * @param {number} value - Bucket value
+     * @param {string} unit - Granularity unit (m, h, d, w, y)
+     * @returns {string} Bucket expression
+     */
+    private buildBucketExpr(column: string, value: number, unit: string): string {
+        const unitToSeconds: Record<string, number> = {
+            m: 60,
+            h: 3600,
+            d: 86400,
+            w: 604800,
+            y: 31536000
+        };
+
+        const seconds = unitToSeconds[unit];
+        if (!seconds) {
+            throw new AppError(400, "Invalid granularity unit");
+        }
+
+        const bucketSize = value * seconds;
+
+        return `
+        to_timestamp(
+            floor(extract(epoch from ${column}) / ${bucketSize}) * ${bucketSize}
+        )
+    `;
     }
 }

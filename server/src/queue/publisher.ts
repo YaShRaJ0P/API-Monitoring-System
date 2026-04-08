@@ -6,8 +6,7 @@ const log = createLogger("Publisher");
 
 /**
  * Direct publish to the RabbitMQ telemetry exchange.
- * Used by the Circuit Breaker as its action function.
- * Topology (exchange, queues, bindings) is set up in RabbitMQ.setupTopology().
+ * Used by the Circuit Breaker.
  * @param {unknown} message - Telemetry payload to publish
  * @returns {boolean} Whether the message was written to the buffer
  */
@@ -25,6 +24,6 @@ export const rawPublish = async (message: unknown) => {
         return response;
     } catch (error) {
         log.error("Raw publish failed", undefined, error instanceof Error ? error : undefined);
-        throw error; // Let circuit breaker catch this to trip
+        throw error;
     }
 };

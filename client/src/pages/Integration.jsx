@@ -1,234 +1,217 @@
 import { useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import {
-  Copy,
-  Check,
-  RefreshCw,
-  Key,
-  Terminal,
-  Package,
-  ChevronDown,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { generateApiKey } from "@/api/tenant.api";
-import { setEnvId } from "@/store/slices/authSlice";
+import { useSelector } from "react-redux";
+import { Copy, Check, Key, ExternalLink, Settings } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 /**
- * Integration page — API key management + SDK/cURL docs.
+ * Integration page - SDK quick-start guide, and payload reference.
  */
 export default function Integration() {
-  const [copied, setCopied] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-  const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const [copied, setCopied] = useState(null);
+  const { projects, activeProjectId } = useSelector((state) => state.auth);
+  const { projectName: projectSlug } = useParams();
 
-  const envId = user?.env_id || "No API key generated";
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const apiKey = activeProject?.api_key || "YOUR_API_KEY";
+  const apiSecret = activeProject?.api_secret || "YOUR_API_SECRET";
 
-  const handleCopy = (text) => {
+  const handleCopy = (key, text) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const handleRegenerate = async () => {
-    setRegenerating(true);
-    try {
-      const newKey = await generateApiKey();
-      dispatch(setEnvId(newKey));
-    } finally {
-      setRegenerating(false);
-    }
-  };
+  const sdkExample = `import { MonitoAPI } from "monito-api";
 
-  const curlExample = `curl -X POST ${apiUrl}/ingest \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: ${envId}" \\
-  -d '{
-    "event_id": "550e8400-e29b-41d4-a716-446655440000",
-    "tenant_id": "${user?.id || "YOUR_TENANT_ID"}",
-    "endpoint": "/api/users",
-    "method": "GET",
-    "status": 200,
-    "latency": 45.2,
-    "timestamp": "${new Date().toISOString()}",
-    "environment": "production",
-    "service": "user-service",
-    "error": null
-  }'`;
-
-  const sdkExample = `import { AntigravityMonitor } from "@antigravity/monitor";
-
-const monitor = new AntigravityMonitor({
-  apiKey: "${envId}",
-  service: "my-api",
+const monito = new MonitoAPI({
+  apiKey: "${apiKey}",
+  apiSecret: "${apiSecret}",
   environment: "production",
 });
 
-// Express middleware — auto-captures every request
-app.use(monitor.middleware());`;
+// 1. Initialize globally
+app.use(monito.init());
+
+// 2. Tag your routers
+app.use("/api/users", monito.service("user-service"), usersRouter);`;
+
+  const cardCls =
+    "relative rounded-2xl bg-[#111118] border border-white/5 overflow-hidden";
+
+  const CodeBlock = ({ code, copyKey }) => (
+    <div className="relative group">
+      <pre className="bg-[#0a0a10] border border-white/5 rounded-xl p-4 text-xs mono text-slate-300 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+        <code>{code}</code>
+      </pre>
+      <button
+        onClick={() => handleCopy(copyKey, code)}
+        className="absolute top-3 right-3 size-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-slate-200 transition-all opacity-0 group-hover:opacity-100"
+      >
+        {copied === copyKey ? (
+          <Check className="size-3.5 text-emerald-400" />
+        ) : (
+          <Copy className="size-3.5" />
+        )}
+      </button>
+    </div>
+  );
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Integration</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your API key and integrate monitoring into your services.
-        </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            Integration
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Integrate the monitoring SDK or send events via HTTP.
+          </p>
+        </div>
+        <a
+          href={`/${projectSlug}/settings`}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors border border-white/10 rounded-xl px-3 py-2 hover:border-cyan-400/20"
+        >
+          <Settings className="size-3.5" />
+          Manage Projects &amp; API Keys
+          <ExternalLink className="size-3" />
+        </a>
       </div>
 
-      {/* API Key Card */}
-      <Card className="border-none shadow-lg bg-card/80 backdrop-blur-xl">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Key className="size-5 text-primary" />
-            API Key
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <code className="flex-1 bg-muted px-4 py-3 rounded-lg text-sm font-mono break-all select-all">
-              {envId}
-            </code>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleCopy(envId)}
-              className="shrink-0"
-            >
-              {copied ? (
-                <Check className="size-4 text-emerald-500" />
-              ) : (
-                <Copy className="size-4" />
-              )}
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="icon" className="shrink-0">
-                  <RefreshCw
-                    className={`size-4 ${regenerating ? "animate-spin" : ""}`}
-                  />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Regenerate API Key?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will invalidate your current key. All services using
-                    the old key will stop sending data until updated.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRegenerate}>
-                    Regenerate
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+      {/* API Key and Secret panel */}
+      {activeProject && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={cardCls}>
+            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/40 to-transparent" />
+            <div className="p-4 flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center shrink-0">
+                <Key className="size-4 text-cyan-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-500 mb-1">
+                  API Key for{" "}
+                  <span className="text-slate-300 font-medium">
+                    {activeProject.name}
+                  </span>
+                </p>
+                <code className="text-xs mono text-cyan-300 break-all select-all">
+                  {apiKey}
+                </code>
+              </div>
+              <button
+                onClick={() => handleCopy("apikey", apiKey)}
+                title="Copy API key"
+                className="size-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-500 hover:text-cyan-400 transition-all shrink-0"
+              >
+                {copied === "apikey" ? (
+                  <Check className="size-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            Include this key as the{" "}
-            <code className="bg-muted px-1 rounded">x-api-key</code> header in
-            all requests to the ingestion endpoint.
-          </p>
-        </CardContent>
-      </Card>
+          <div className={cardCls}>
+            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-rose-400/40 to-transparent" />
+            <div className="p-4 flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-rose-400/10 border border-rose-400/20 flex items-center justify-center shrink-0">
+                <Key className="size-4 text-rose-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-500 mb-1">
+                  API Secret (Keep hidden!)
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs mono text-rose-300 truncate max-w-[120px] select-all relative group">
+                    <span className="blur-sm group-hover:blur-none transition-all">
+                      {apiSecret}
+                    </span>
+                  </code>
+                </div>
+              </div>
+              <button
+                onClick={() => handleCopy("apisecret", apiSecret)}
+                title="Copy API secret"
+                className="size-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-500 hover:text-rose-400 transition-all shrink-0"
+              >
+                {copied === "apisecret" ? (
+                  <Check className="size-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Start */}
-      <Card className="border-none shadow-lg bg-card/80 backdrop-blur-xl">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Quick Start</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="sdk" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="sdk" className="gap-2">
-                <Package className="size-3.5" /> NPM SDK
-              </TabsTrigger>
-              <TabsTrigger value="curl" className="gap-2">
-                <Terminal className="size-3.5" /> cURL
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="sdk">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium mb-2">
-                    1. Install the package
-                  </p>
-                  <pre className="bg-muted rounded-lg p-4 text-sm font-mono overflow-x-auto">
-                    <code>npm install @antigravity/monitor</code>
-                  </pre>
-                </div>
-                <div>
-                  <p className="text-sm font-medium mb-2">
-                    2. Initialize & attach middleware
-                  </p>
-                  <pre className="bg-muted rounded-lg p-4 text-sm font-mono overflow-x-auto whitespace-pre-wrap">
-                    <code>{sdkExample}</code>
-                  </pre>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="curl">
-              <div>
-                <p className="text-sm font-medium mb-2">Send a test event</p>
-                <pre className="bg-muted rounded-lg p-4 text-sm font-mono overflow-x-auto whitespace-pre-wrap">
-                  <code>{curlExample}</code>
-                </pre>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      <div className={cardCls}>
+        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-violet-400/30 to-transparent" />
+        <div className="p-5">
+          <h2 className="text-sm font-semibold text-white mb-4">Quick Start</h2>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-medium text-slate-400 mb-2">
+                1. Install the package
+              </p>
+              <CodeBlock code="npm install monito-api" copyKey="install" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-400 mb-2">
+                2. Initialize &amp; attach middleware
+              </p>
+              <CodeBlock code={sdkExample} copyKey="sdk" />
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Payload Reference */}
-      <Card className="border-none shadow-lg bg-card/80 backdrop-blur-xl">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Payload Reference</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border overflow-hidden">
-            <table className="w-full text-sm">
+      <div className={cardCls}>
+        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
+        <div className="p-5">
+          <h2 className="text-sm font-semibold text-white mb-4">
+            Payload Reference
+          </h2>
+          <div className="rounded-xl border border-white/5 overflow-hidden">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="bg-muted/50">
-                  <th className="text-left p-3 font-medium">Field</th>
-                  <th className="text-left p-3 font-medium">Type</th>
-                  <th className="text-left p-3 font-medium">Required</th>
-                  <th className="text-left p-3 font-medium hidden md:table-cell">
+                <tr className="bg-white/3 border-b border-white/5">
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Field
+                  </th>
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Required
+                  </th>
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">
                     Description
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {[
                   [
                     "event_id",
                     "UUID v4",
-                    "Yes",
-                    "Unique identifier for this event",
+                    "Auto",
+                    "Unique identifier (auto-set by SDK)",
                   ],
                   [
                     "tenant_id",
                     "UUID v4",
-                    "Yes",
-                    "Your tenant ID (auto-set by SDK)",
+                    "Auto",
+                    "Your tenant ID (auto-set by server)",
+                  ],
+                  [
+                    "project_id",
+                    "UUID v4",
+                    "Auto",
+                    "Project ID (auto-set by server)",
                   ],
                   [
                     "endpoint",
@@ -237,7 +220,7 @@ app.use(monitor.middleware());`;
                     "API endpoint path (e.g. /api/users)",
                   ],
                   ["method", "string", "Yes", "HTTP method (GET, POST, etc.)"],
-                  ["status", "number", "Yes", "HTTP status code (100–599)"],
+                  ["status", "number", "Yes", "HTTP status code (100-500)"],
                   ["latency", "number", "Yes", "Response time in milliseconds"],
                   ["timestamp", "ISO 8601", "Yes", "When the request occurred"],
                   [
@@ -251,27 +234,34 @@ app.use(monitor.middleware());`;
                     "error",
                     "string | null",
                     "No",
-                    "Error message if status >= 400",
+                    "Error message if status ≥ 400",
                   ],
                 ].map(([field, type, required, desc]) => (
                   <tr
                     key={field}
-                    className="hover:bg-muted/30 transition-colors"
+                    className="border-b border-white/5 hover:bg-white/3 transition-colors"
                   >
                     <td className="p-3">
-                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                      <code className="mono bg-white/5 px-1.5 py-0.5 rounded text-slate-300">
                         {field}
                       </code>
                     </td>
-                    <td className="p-3 text-muted-foreground">{type}</td>
+                    <td className="p-3 text-slate-500">{type}</td>
                     <td className="p-3">
                       <span
-                        className={`text-xs font-medium ${required === "Yes" ? "text-primary" : "text-muted-foreground"}`}
+                        className={cn(
+                          "badge",
+                          required === "Yes"
+                            ? "badge-cyan"
+                            : required === "Auto"
+                              ? "badge-green"
+                              : "badge-muted",
+                        )}
                       >
                         {required}
                       </span>
                     </td>
-                    <td className="p-3 text-muted-foreground hidden md:table-cell">
+                    <td className="p-3 text-slate-500 hidden md:table-cell">
                       {desc}
                     </td>
                   </tr>
@@ -279,8 +269,8 @@ app.use(monitor.middleware());`;
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

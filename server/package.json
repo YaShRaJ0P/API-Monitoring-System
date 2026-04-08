@@ -9,13 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
-    "api-monitoring",
-    "telemetry",
-    "rabbitmq"
+    "api-monitoring"
   ],
   "author": "",
   "license": "ISC",
-  "description": "API Monitoring System — Backend server for ingesting, processing, and analyzing API telemetry data.",
+  "description": "API Monitoring System - Server for ingesting, processing, and analyzing API data.",
   "dependencies": {
     "amqplib": "^0.10.9",
     "bcryptjs": "^3.0.3",
@@ -28,6 +26,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.1",
+    "nodemailer": "^8.0.4",
     "opossum": "^9.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
@@ -45,6 +44,7 @@
     "@types/express-session": "^1.18.2",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.2.3",
+    "@types/nodemailer": "^7.0.11",
     "@types/opossum": "^8.1.9",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",

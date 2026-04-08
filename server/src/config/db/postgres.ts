@@ -3,6 +3,9 @@ const { Pool } = pkg;
 import { config } from "../config.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import { createLogger } from "../../shared/utils/logger.js";
+import fs from "fs";
+import path from "path";
+
 
 const log = createLogger("PostgreSQL");
 
@@ -26,19 +29,32 @@ export class PostgreSQL {
         const uri = config.db.postgres.uri;
 
         if (!uri) {
-            throw new AppError(500, "PostgreSQL URI is not defined");
+            log.error("PostgreSQL URI is not defined");
+            throw new AppError(500, "Internal Server Error");
         }
 
         try {
+
+            // Verify connection and setup schema
+            const sqlPath = path.join(process.cwd(), "scripts/schema.sql");
+
+            if (!fs.existsSync(sqlPath)) {
+                log.error(`Schema file missing: ${sqlPath}`);
+                throw new AppError(500, "Internal Server Error");
+            }
+
+            const sql = fs.readFileSync(sqlPath, "utf8");
+
             this.pool = new Pool({
                 connectionString: uri,
+                ssl: config.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
                 max: 10,
                 idleTimeoutMillis: 30000,
                 connectionTimeoutMillis: 5000,
             });
 
-            // Verify connection and setup schema
-            await this.setupSchema();
+            await this.pool.query("SELECT 1");
+            await this.pool.query(sql);
 
             log.info("PostgreSQL connected and schema verified");
             return this.pool;
@@ -49,101 +65,14 @@ export class PostgreSQL {
     }
 
     /**
-     * Creates required tables and indexes if they don't exist.
-     * @returns {Promise<void>}
-     */
-    private static async setupSchema(): Promise<void> {
-        if (!this.pool) return;
-
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS tenants (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                email VARCHAR(255) UNIQUE NOT NULL,
-                google_id VARCHAR(255) UNIQUE,
-                name VARCHAR(255),
-                avatar TEXT,
-                env_id UUID UNIQUE DEFAULT gen_random_uuid(),
-                refresh_token TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS minute_metrics (
-                tenant_id UUID NOT NULL,
-                service VARCHAR(255) NOT NULL,
-                environment VARCHAR(255) NOT NULL,
-                endpoint VARCHAR(255) NOT NULL,
-                method VARCHAR(10) NOT NULL DEFAULT 'GET',
-                minute_bucket TIMESTAMP WITH TIME ZONE NOT NULL,
-                total_requests INT DEFAULT 0,
-                success_count INT DEFAULT 0,
-                failure_count INT DEFAULT 0,
-                total_latency BIGINT DEFAULT 0,
-                min_latency INT DEFAULT 0,
-                max_latency INT DEFAULT 0,
-                PRIMARY KEY (tenant_id, service, environment, endpoint, method, minute_bucket)
-            );
-
-            CREATE TABLE IF NOT EXISTS hourly_metrics (
-                tenant_id UUID NOT NULL,
-                service VARCHAR(255) NOT NULL,
-                environment VARCHAR(255) NOT NULL,
-                endpoint VARCHAR(255) NOT NULL,
-                method VARCHAR(10) NOT NULL DEFAULT 'GET',
-                hour_bucket TIMESTAMP WITH TIME ZONE NOT NULL,
-                total_requests INT DEFAULT 0,
-                success_count INT DEFAULT 0,
-                failure_count INT DEFAULT 0,
-                total_latency BIGINT DEFAULT 0,
-                min_latency INT DEFAULT 0,
-                max_latency INT DEFAULT 0,
-                PRIMARY KEY (tenant_id, service, environment, endpoint, method, hour_bucket)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_minute_metrics_cleanup ON minute_metrics(minute_bucket);
-            CREATE INDEX IF NOT EXISTS idx_metrics_service_env ON minute_metrics(service, environment);
-            CREATE INDEX IF NOT EXISTS idx_metrics_endpoint ON minute_metrics(endpoint, method);
-
-            -- Alert Rules Table
-            CREATE TABLE IF NOT EXISTS alert_rules (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                tenant_id UUID NOT NULL,
-                name VARCHAR(255) NOT NULL,
-                metric VARCHAR(50) NOT NULL, -- 'error_rate', 'latency', 'request_count'
-                condition VARCHAR(10) NOT NULL, -- '>', '<'
-                threshold FLOAT NOT NULL,
-                window_minutes INT NOT NULL DEFAULT 5,
-                cooldown_minutes INT NOT NULL DEFAULT 60,
-                silence_until TIMESTAMP WITH TIME ZONE,
-                enabled BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_alert_rules_tenant ON alert_rules(tenant_id);
-
-            -- Alert History Table
-            CREATE TABLE IF NOT EXISTS alert_history (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                rule_id UUID NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,
-                tenant_id UUID NOT NULL,
-                metric_value FLOAT NOT NULL,
-                triggered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_alert_history_tenant ON alert_history(tenant_id);
-            CREATE INDEX IF NOT EXISTS idx_alert_history_rule ON alert_history(rule_id);
-        `);
-    }
-
-    /**
      * Returns the active PostgreSQL pool.
      * @returns {Pool} pg Pool instance
      * @throws {AppError} 500 if not yet initialized
      */
     static getPool(): pkg.Pool {
         if (!this.pool) {
-            throw new AppError(500, "PostgreSQL not initialized. Call connect() first.");
+            log.error("PostgreSQL not initialized");
+            throw new AppError(500, "Internal Server Error");
         }
         return this.pool;
     }
@@ -171,11 +100,15 @@ export class PostgreSQL {
      * @returns {Promise<"connected" | "disconnected">}
      */
     static async getStatus(): Promise<"connected" | "disconnected"> {
-        if (!this.pool) return "disconnected";
+        if (!this.pool) {
+            log.error("PostgreSQL not initialized");
+            return "disconnected";
+        }
         try {
             await this.pool.query("SELECT 1");
             return "connected";
         } catch {
+            log.error("PostgreSQL connection failed");
             return "disconnected";
         }
     }

@@ -1,52 +1,50 @@
 import { createTelemetryConsumer } from "../queue/consumer.js";
-import { EventStore } from "../modules/processing/event-store.js";
+import { createEmailConsumer } from "../queue/email.consumer.js";
+import { MetricsStore } from "../modules/processing/metrics-store.js";
+import { MongoProjector } from "../modules/processing/mongo-projector.js";
 import { ProcessingService } from "../modules/processing/processing.service.js";
-import { MetricsProjector } from "../modules/processing/metrics-projector.js";
 import { OutboxProcessor } from "../modules/processing/outbox-processor.js";
-import { AlertsJob } from "../modules/alerts/alerts.job.js";
+import { AlertWorker } from "../modules/alerts/alerts.job.js";
 import { DataBaseConfig } from "../config/db/index.js";
 import { createLogger } from "../shared/utils/logger.js";
 import { AppError } from "../shared/errors/AppError.js";
+import { config } from "../config/config.js";
 
 const log = createLogger("Bootstrap");
 
-/** OutboxProcessor reference for graceful shutdown */
 let outboxProcessor: OutboxProcessor | null = null;
-/** Retention cleanup interval reference */
 let cleanupInterval: NodeJS.Timeout | null = null;
-/** Alerts job reference */
-let alertsJob: AlertsJob | null = null;
+let alertsJob: AlertWorker | null = null;
 
 /**
- * Composition root for background processes.
- * Creates all dependencies and wires them together via DI.
+ * Root of Background Processors
  */
 export const startConsumers = async () => {
     try {
         log.info("Initializing background consumers...");
 
-        // ── Command side (CQRS) ──
-        const eventStore = new EventStore();
-        const processingService = new ProcessingService(eventStore);
+        const pool = DataBaseConfig.getPostgresPool();
+        const metricsStore = new MetricsStore(pool);
+        const processingService = new ProcessingService(metricsStore);
 
-        // Start telemetry consumer (RabbitMQ → EventStore)
+        // Start telemetry consumer worker
         await createTelemetryConsumer(processingService);
 
-        // ── Query side (CQRS Projection) ──
-        const pool = DataBaseConfig.getPostgresPool();
-        const projector = new MetricsProjector(pool);
-        outboxProcessor = new OutboxProcessor(projector);
+        // Start asynchronous Email consumer worker
+        await createEmailConsumer();
 
+        // For Outbox Projection
+        const mongoProjector = new MongoProjector();
+        outboxProcessor = new OutboxProcessor(pool, mongoProjector);
 
-        // Start outbox polling (MongoDB outbox → PostgreSQL metrics)
         outboxProcessor.start();
 
-        // ── Alerts Job ──
-        alertsJob = new AlertsJob();
-        alertsJob.start(); // 1-minute interval
+        // -- Alerts Job --
+        alertsJob = new AlertWorker();
+        alertsJob.start(config.worker.alert.interval);
 
-        // ── Retention Cleanup (Minute Metrics) ──
-        // Run every hour to delete minute_metrics older than 24h
+        // -- Retention Cleanup (Minute Metrics) --
+        // Run to delete minute_metrics at each interval
         cleanupInterval = setInterval(async () => {
             try {
                 const result = await pool.query(
@@ -56,9 +54,8 @@ export const startConsumers = async () => {
             } catch (err) {
                 log.error("Retention cleanup failed", undefined, err instanceof Error ? err : undefined);
             }
-        }, 60 * 60 * 1000); // 1 hour
+        }, config.worker.minuteMetrics.interval);
 
-        log.info("Retention cleanup job scheduled (every 1h)");
 
         log.info("All consumers and processors are up and running");
     } catch (error) {

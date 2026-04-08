@@ -11,12 +11,13 @@ export const config = {
     port: process.env.PORT || 3000,
     client_uri: process.env.CLIENT_URI || "http://localhost:5173",
     NODE_ENV: process.env.NODE_ENV || "development",
+    LOG_LEVEL: process.env.LOG_LEVEL || "debug",
 
     cors: {
         origin: process.env.CORS_ORIGIN || "http://localhost:5173",
         credentials: true,
         methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
-        allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
+        allowedHeaders: ["Content-Type", "Authorization", "x-api-key", "x-signature", "x-timestamp"],
     },
 
     db: {
@@ -56,5 +57,31 @@ export const config = {
     api: {
         prefix: "/api",
         version: "v1"
+    },
+
+    email: {
+        host: process.env.SMTP_HOST || "",
+        port: parseInt(process.env.SMTP_PORT || "587", 10),
+        secure: process.env.SMTP_SECURE === "true", // true for 465, false for 587
+        user: process.env.SMTP_USER || "",
+        pass: process.env.SMTP_PASS || "",
+        fromName: process.env.SMTP_FROM_NAME || "Monito API",
+        fromAddress: process.env.SMTP_FROM_ADDRESS || "alerts@apimonito.sys",
+    },
+
+
+    worker: {
+        alert: {
+            interval: 60_000,
+        },
+        outbox: {
+            pollIntervalMs: 5000,
+            batchSize: 100,
+            maxRetries: 3,
+        },
+        minuteMetrics: {
+            interval: 120 * 60 * 1000, // 2 hours
+        }
+
     }
 }

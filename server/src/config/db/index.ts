@@ -24,7 +24,7 @@ export class DataBaseConfig {
         }
 
         try {
-            // we parallelize connections for faster startup
+            // parallelize connections for faster startup
             await Promise.all([
                 MongoDB.connect(),
                 PostgreSQL.connect(),

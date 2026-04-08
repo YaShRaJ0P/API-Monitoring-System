@@ -7,7 +7,7 @@ import client from "./client";
  */
 export const getDlqEntries = async (params = {}) => {
     const { data } = await client.get("/admin/dlq", { params });
-    return { data: data.data, total: data.total, totalPages: data.totalPages };
+    return { data: data.data, total: data.total, totalPages: data.totalPages, page: data.page };
 };
 
 /**
@@ -16,16 +16,17 @@ export const getDlqEntries = async (params = {}) => {
  */
 export const getDlqStats = async () => {
     const { data } = await client.get("/admin/dlq/stats");
-    return data.data;
+    return data;
 };
 
 /**
  * Replays a single failed DLQ entry by resetting it to pending.
- * @param {string} id - MongoDB ObjectId of the entry
+ * @param {string} id - event_id (UUID) of the outbox entry
  * @returns {Promise<void>}
  */
 export const replayDlqEntry = async (id) => {
-    await client.post(`/admin/dlq/replay/${id}`);
+    const { data } = await client.post(`/admin/dlq/replay/${id}`);
+    return data;
 };
 
 /**

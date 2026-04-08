@@ -15,38 +15,37 @@ const log = createLogger("MetricsService");
 
 /**
  * Service layer for metrics read operations.
- * Delegates to MetricsRepository and enriches timeseries with gap-filled buckets.
+ * All queries are scoped by project_id.
  */
 export class MetricsService {
     constructor(private readonly metricsRepo: MetricsRepository) { }
 
     /**
-     * Returns dashboard overview stats for a tenant.
+     * Returns dashboard overview stats for a project.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<OverviewResult>} Aggregated overview
      */
-    async getOverview(tenantId: string, filters: MetricsQuery): Promise<OverviewResult> {
-        return this.metricsRepo.getOverview(tenantId, filters);
+    async getOverview(tenantId: string, projectId: string, filters: MetricsQuery): Promise<OverviewResult> {
+        return this.metricsRepo.getOverview(tenantId, projectId, filters);
     }
 
     /**
      * Returns gap-filled time-series data for charting.
-     * Missing buckets are filled with zero values so charts render continuously.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<TimeseriesBucket[]>} Complete time-series with no gaps
      */
-    async getTimeseries(tenantId: string, filters: MetricsQuery): Promise<TimeseriesBucket[]> {
-        const rawBuckets = await this.metricsRepo.getTimeseries(tenantId, filters);
+    async getTimeseries(tenantId: string, projectId: string, filters: MetricsQuery): Promise<TimeseriesBucket[]> {
+        const rawBuckets = await this.metricsRepo.getTimeseries(tenantId, projectId, filters);
 
-        // Build a lookup from the DB results
         const bucketMap = new Map<string, TimeseriesBucket>();
         for (const row of rawBuckets) {
             bucketMap.set(new Date(row.bucket).toISOString(), row);
         }
 
-        // Generate all expected buckets and fill gaps
         const allBuckets = generateBuckets(
             new Date(filters.startDate),
             new Date(filters.endDate),
@@ -63,41 +62,44 @@ export class MetricsService {
             };
         });
 
-        log.debug("Timeseries gap-filled", { tenantId, total: filled.length });
         return filled;
     }
 
     /**
      * Returns per-endpoint performance breakdown.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<EndpointStat[]>} Endpoint stats
      */
-    async getEndpointStats(tenantId: string, filters: MetricsQuery): Promise<EndpointStat[]> {
-        return this.metricsRepo.getEndpointStats(tenantId, filters);
+    async getEndpointStats(tenantId: string, projectId: string, filters: MetricsQuery): Promise<EndpointStat[]> {
+        return this.metricsRepo.getEndpointStats(tenantId, projectId, filters);
     }
 
     /**
      * Returns per-service summary.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<ServiceStat[]>} Service stats
      */
-    async getServiceStats(tenantId: string, filters: MetricsQuery): Promise<ServiceStat[]> {
-        return this.metricsRepo.getServiceStats(tenantId, filters);
+    async getServiceStats(tenantId: string, projectId: string, filters: MetricsQuery): Promise<ServiceStat[]> {
+        return this.metricsRepo.getServiceStats(tenantId, projectId, filters);
     }
 
     /**
      * Returns paginated raw metric logs.
      * @param {string} tenantId - Tenant UUID
+     * @param {string} projectId - Project id
      * @param {MetricsQuery} filters - Validated query parameters
      * @returns {Promise<{ data: MetricLog[], total: number, page: number, limit: number }>}
      */
     async getLogs(
         tenantId: string,
+        projectId: string,
         filters: MetricsQuery,
     ): Promise<{ data: MetricLog[]; total: number; page: number; limit: number }> {
-        const result = await this.metricsRepo.getLogs(tenantId, filters);
+        const result = await this.metricsRepo.getLogs(tenantId, projectId, filters);
         return {
             ...result,
             page: filters.page,

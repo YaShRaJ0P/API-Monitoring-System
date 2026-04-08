@@ -5,19 +5,11 @@ import { createLogger } from "../../shared/utils/logger.js";
 
 const log = createLogger("IngestionService");
 
-/**
- * Represents the result of a fire() call, which can either be
- * a direct boolean from publishTelemetry or the fallback object.
- */
 interface FallbackResult {
     success: boolean;
     buffered: boolean;
 }
 
-/**
- * Orchestrates the ingestion of telemetry data through the circuit breaker.
- * Receives its Circuit dependency via constructor injection.
- */
 export class IngestionService {
     constructor(private readonly circuit: Circuit) { }
 
@@ -40,7 +32,6 @@ export class IngestionService {
                 throw new AppError(500, "Failed to publish telemetry");
             }
 
-            log.debug(`Telemetry published: ${data.event_id}`);
             return { published: true, buffered: false };
         } catch (error) {
             if (error instanceof AppError) throw error;

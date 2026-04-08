@@ -19,7 +19,7 @@ export const MetricsQuerySchema = z.object({
     environment: z.string().optional(),
     endpoint: z.string().optional(),
     method: z.string().optional(),
-
+    errorOnly: z.coerce.boolean().optional().default(false),
     granularity: granularityEnum.optional().default("1h"),
 
     page: z.coerce.number().int().min(1).optional().default(1),

@@ -4,18 +4,15 @@ import { logger } from "../utils/logger.js";
 
 /**
  * Global error-handling middleware.
- * Catches AppError instances and unhandled exceptions,
- * logs them appropriately, and returns a structured JSON response.
  * @param {unknown} err - The thrown error
  * @param {Request} req - Express request
  * @param {Response} res - Express response
- * @param {NextFunction} next - Express next function (required by Express signature)
+ * @param {NextFunction} next - Express next function
  */
 export function errorMiddleware(
     err: unknown,
     req: Request,
     res: Response,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     next: NextFunction,
 ) {
     if (err instanceof AppError) {
@@ -27,7 +24,7 @@ export function errorMiddleware(
         }
 
         return res.status(err.statusCode).json({
-            status: err.status,
+            status: err.statusCode,
             message: err.message,
             details: err.details ?? null
         });

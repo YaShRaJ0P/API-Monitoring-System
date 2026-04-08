@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { handleOAuthCallback } from "@/store/slices/authSlice";
-import { Activity } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 /**
  * OAuth callback landing page.
@@ -24,16 +24,20 @@ export default function LoginSuccess() {
 
     dispatch(handleOAuthCallback(token))
       .unwrap()
-      .then(() => navigate("/", { replace: true }))
+      .then((data) => {
+        if (data.projects && data.projects.length > 0) {
+          navigate("/", { replace: true });
+        } else {
+          navigate("/onboarding", { replace: true });
+        }
+      })
       .catch(() => navigate("/login?error=auth_failed", { replace: true }));
   }, [searchParams, navigate, dispatch]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4 animate-pulse">
-        <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center">
-          <Activity className="size-8 text-primary" />
-        </div>
+      <div className="flex flex-col items-center gap-4 text-cyan-500">
+        <Loader2 className="size-7 animate-spin" />
         <p className="text-muted-foreground text-sm font-medium">
           Completing sign in...
         </p>

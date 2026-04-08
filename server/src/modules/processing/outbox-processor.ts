@@ -1,107 +1,130 @@
-import OutboxEntry from "../../models/OutboxEntry.js";
-import type { MetricsProjector } from "./metrics-projector.js";
+import type { Pool } from "pg";
+import type { MongoProjector } from "./mongo-projector.js";
+import type { IngestionType } from "../ingestion/ingestion.validator.js";
 import { createLogger } from "../../shared/utils/logger.js";
+import { config } from "../../config/config.js";
 
 const log = createLogger("OutboxProcessor");
 
-// ── Configuration ──
-const POLL_INTERVAL_MS = 5000;
-const BATCH_SIZE = 50;
-const MAX_ATTEMPTS = 5;
-
 /**
- * Polls MongoDB outbox for pending entries and projects them
- * to PostgreSQL via MetricsProjector.
- *
- * Runs as a background process alongside the RabbitMQ consumer.
- * If PostgreSQL is down, entries remain pending and are retried
- * on the next poll — guaranteeing eventual consistency.
+ * Background processor that polls the PostgreSQL `outbox_entries` table.
+ * It reads pending events and adds them into MongoDB as `RawEvent` documents.
  */
 export class OutboxProcessor {
-    private intervalId: ReturnType<typeof setInterval> | null = null;
+    private isRunning = false;
+    private timeoutId: NodeJS.Timeout | null = null;
     private isProcessing = false;
 
-    constructor(private readonly projector: MetricsProjector) { }
+    // Configuration
+    private readonly pollIntervalMs = config.worker.outbox.pollIntervalMs || 5000;
+    private readonly batchSize = config.worker.outbox.batchSize || 100;
+    private readonly maxRetries = config.worker.outbox.maxRetries || 3;
+
+    constructor(
+        private readonly pool: Pool,
+        private readonly mongoProjector: MongoProjector
+    ) { }
 
     /**
      * Starts the outbox polling loop.
-     * Safe to call multiple times — will not create duplicate intervals.
      */
-    start(): void {
-        if (this.intervalId) {
-            log.warn("OutboxProcessor is already running");
-            return;
-        }
-
-        log.info(`OutboxProcessor started (polling every ${POLL_INTERVAL_MS / 1000}s)`);
-
-        this.intervalId = setInterval(() => {
-            this.processBatch().catch((err) => {
-                log.error("Outbox batch processing error", undefined, err instanceof Error ? err : undefined);
-            });
-        }, POLL_INTERVAL_MS);
+    start() {
+        if (this.isRunning) return;
+        this.isRunning = true;
+        log.info("Starting PostgreSQL OutboxProcessor...");
+        this.scheduleNextQuery();
     }
 
     /**
-     * Stops the polling loop gracefully.
-     * Waits for any in-flight batch to finish before returning.
+     * Gracefully stops the outbox polling loop.
      */
-    async stop(): Promise<void> {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
+    async stop() {
+        if (!this.isRunning) return;
+        this.isRunning = false;
+        log.info("Stopping PostgreSQL OutboxProcessor...");
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
         }
 
-        // Wait for any in-flight processing to complete
+        // Wait for current batch to finish if processing
         while (this.isProcessing) {
-            log.info("Waiting for outbox batch to finish...");
-            await new Promise((r) => setTimeout(r, 200));
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
-
-        log.info("OutboxProcessor stopped");
+        log.info("PostgreSQL OutboxProcessor stopped gracefully.");
     }
 
-    /**
-     * Processes a batch of pending outbox entries.
-     * Each entry is projected independently — a single failure
-     * doesn't block the rest of the batch.
-     */
+    private scheduleNextQuery() {
+        if (!this.isRunning) return;
+        this.timeoutId = setTimeout(() => {
+            this.processBatch().catch(err => {
+                log.error("Outbox processing batch failed", undefined, err instanceof Error ? err : undefined);
+            }).finally(() => {
+                this.scheduleNextQuery();
+            });
+        }, this.pollIntervalMs);
+    }
+
     private async processBatch(): Promise<void> {
         if (this.isProcessing) return;
         this.isProcessing = true;
 
         try {
-            const entries = await OutboxEntry.find({ status: "pending" })
-                .sort({ createdAt: 1 })
-                .limit(BATCH_SIZE);
+            // 1. Fetch pending entries, order by creation, limit to batchSize
+            const { rows: entries } = await this.pool.query(
+                `SELECT event_id, payload, attempts
+                 FROM outbox_entries
+                 WHERE status = 'pending'
+                 ORDER BY created_at ASC
+                 LIMIT $1`,
+                [this.batchSize]
+            );
 
-            if (entries.length === 0) return;
-
-            log.debug(`Processing ${entries.length} outbox entries`);
-
+            if (entries.length === 0) {
+                return; // Nothing to process
+            }
+            // 2. Process each entry
             for (const entry of entries) {
-                try {
-                    await this.projector.project(entry.payload as Record<string, unknown>);
-
-                    entry.status = "processed";
-                    entry.processedAt = new Date();
-                    await entry.save();
-                } catch (error) {
-                    entry.attempts += 1;
-                    entry.lastError = error instanceof Error ? error.message : String(error);
-
-                    if (entry.attempts >= MAX_ATTEMPTS) {
-                        entry.status = "failed";
-                        log.error(`Outbox entry ${entry.event_id} failed permanently after ${MAX_ATTEMPTS} attempts`);
-                    } else {
-                        log.warn(`Outbox entry ${entry.event_id} failed (attempt ${entry.attempts}/${MAX_ATTEMPTS})`);
-                    }
-
-                    await entry.save();
-                }
+                await this.processEntry(entry);
             }
         } finally {
             this.isProcessing = false;
+        }
+    }
+
+    private async processEntry(entry: any): Promise<void> {
+        const { event_id, payload, attempts } = entry;
+        const newAttempts = attempts + 1;
+
+        try {
+            const ingestionData = payload as IngestionType;
+            await this.mongoProjector.project(ingestionData);
+
+            // Mark as processed in PostgreSQL
+            await this.pool.query(
+                `UPDATE outbox_entries
+                 SET status = 'processed', processed_at = NOW(), attempts = $1
+                 WHERE event_id = $2`,
+                [newAttempts, event_id]
+            );
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            log.error(`Failed to process outbox entry: ${event_id}`, undefined, error instanceof Error ? error : undefined);
+
+            const newStatus = newAttempts >= this.maxRetries ? 'failed' : 'pending';
+
+            // Mark as failed or increment attempts in PostgreSQL
+            await this.pool.query(
+                `UPDATE outbox_entries
+                 SET status = $1, last_error = $2, attempts = $3
+                 WHERE event_id = $4`,
+                [newStatus, errorMessage, newAttempts, event_id]
+            );
+
+            if (newStatus === 'failed') {
+                log.error(`Outbox entry ${event_id} marked as failed after ${newAttempts} attempts.`);
+            }
         }
     }
 }

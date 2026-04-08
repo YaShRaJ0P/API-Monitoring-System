@@ -5,50 +5,63 @@ import response from "../../shared/utils/response.js";
 import { validateIngestion } from "./ingestion.validator.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import { generateEventId } from "../../shared/utils/generateEventId.js";
+import { createLogger } from "../../shared/utils/logger.js";
+
+const log = createLogger("IngestionController");
 
 /**
  * Controller for telemetry data ingestion.
- * Validates incoming payloads and delegates to IngestionService.
  */
 export class IngestionController {
     constructor(private readonly ingestionService: IngestionService) { }
 
     /**
-     * Validates and ingests telemetry data from the authenticated client.
-     * Returns 200 if published directly, 202 if buffered due to circuit breaker.
-     * @param {AuthRequest} req - Express request with authenticated tenant ID
-     * @param {Response} res - Express response
+     * Ingests a single telemetry event from an authenticated SDK client.
+     *
+     * @param {Request}      req  - Express request
+     * @param {Response}     res  - Express response
      * @param {NextFunction} next - Express next function
      */
     ingestData = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const data = req.body;
+            const authReq = req as AuthRequest;
+            const tenantId = authReq.id;
+            const projectId = authReq.project_id;
 
-            const userId = (req as AuthRequest).id;
-            if (!userId) {
-                throw new AppError(401, "Unauthorized");
+            if (!tenantId || !projectId) {
+                throw new AppError(401, "Unauthorized - API key context missing");
             }
 
-            data.tenant_id = userId;
-            data.event_id = generateEventId();
+            const xTimestamp = req.headers["x-timestamp"] as string;
+            const eventTimestamp = new Date(parseInt(xTimestamp, 10)).toISOString();
 
-            const validationResponse = validateIngestion(data);
+            const data = {
+                ...authReq.body,
+                tenant_id: tenantId,
+                project_id: projectId,
+                event_id: generateEventId(),
+                timestamp: eventTimestamp,
+            };
 
-            if (!validationResponse.success) {
-                return response(res, 400, "Invalid data", validationResponse.error);
+            log.info(`Ingesting event for tenant=${tenantId} project=${projectId}`);
+
+            const validationResult = validateIngestion(data);
+
+            if (!validationResult.success) {
+                return response(res, 400, "Validation failed", validationResult.error);
             }
 
-            const validatedData = validationResponse.data;
-            const result = await this.ingestionService.ingestData(validatedData);
+            const result = await this.ingestionService.ingestData(validationResult.data);
 
             if (result.buffered) {
-                // 202 = Accepted but not yet processed (buffered due to circuit breaker)
-                return response(res, 202, "Data accepted and buffered for processing", null);
+                // 202 Accepted - the circuit breaker is open; event is safely buffered in Redis
+                return response(res, 202, "Event accepted and buffered for processing", null);
             }
 
-            response(res, 200, "Data ingested successfully", null);
+            response(res, 200, "Event ingested successfully", null);
+
         } catch (error) {
             next(error);
         }
-    }
+    };
 }

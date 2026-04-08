@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import type { ZodSchema } from "zod";
 import { ZodError } from "zod";
 
@@ -6,9 +6,9 @@ import { ZodError } from "zod";
  * Express middleware factory for validating request bodies against a Zod schema.
  * Returns 400 with field-level errors if validation fails.
  * @param {ZodSchema} schema - Zod schema to validate against
- * @returns {Function} Express middleware
+ * @returns {RequestHandler} Express middleware
  */
-export function validate(schema: ZodSchema) {
+export function validate(schema: ZodSchema): RequestHandler {
     return (req: Request, res: Response, next: NextFunction) => {
         try {
             req.body = schema.parse(req.body);

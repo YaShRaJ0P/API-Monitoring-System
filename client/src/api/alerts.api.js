@@ -1,22 +1,23 @@
 import client from "./client";
 
 /**
- * Fetches all alert rules for the authenticated tenant.
- * @returns {Promise<Array>} Alert rules
+ * Fetches all alert rules for a project.
+ * @param {string} projectId - Project id
+ * @returns {Promise<Array>} Alert rules array
  */
-export const getRules = async () => {
-    const { data } = await client.get("/alerts");
-    return data.data;
+export const getRules = async (projectId) => {
+    const res = await client.get("/alerts", { params: { project_id: projectId } });
+    return res.data;
 };
 
 /**
- * Creates a new alert rule.
+ * Creates a new alert rule for a project.
  * @param {object} ruleData - Alert rule payload
  * @returns {Promise<object>} Created rule
  */
 export const createRule = async (ruleData) => {
-    const { data } = await client.post("/alerts", ruleData);
-    return data.data;
+    const res = await client.post("/alerts", ruleData);
+    return res.data;
 };
 
 /**
@@ -26,8 +27,8 @@ export const createRule = async (ruleData) => {
  * @returns {Promise<object>} Updated rule
  */
 export const updateRule = async (id, updates) => {
-    const { data } = await client.put(`/alerts/${id}`, updates);
-    return data.data;
+    const res = await client.put(`/alerts/${id}`, updates);
+    return res.data;
 };
 
 /**
@@ -40,11 +41,24 @@ export const deleteRule = async (id) => {
 };
 
 /**
- * Fetches paginated alert history for the authenticated tenant.
+ * Manually resolves an active alert rule incident.
+ * @param {string} id - Rule UUID
+ * @returns {Promise<object>}
+ */
+export const resolveRule = async (id) => {
+    const res = await client.post(`/alerts/${id}/resolve`);
+    return res.data;
+};
+
+/**
+ * Fetches paginated alert history for a project.
+ * @param {string} projectId - Project id
  * @param {{ page?: number, limit?: number }} params
  * @returns {Promise<{ data: Array, total: number }>}
  */
-export const getAlertHistory = async (params = {}) => {
-    const { data } = await client.get("/alerts/history", { params });
-    return { data: data.data, total: data.total };
+export const getAlertHistory = async (projectId, params = {}) => {
+    const res = await client.get("/alerts/history", {
+        params: { project_id: projectId, ...params },
+    });
+    return res.data;
 };

@@ -28,7 +28,7 @@ const startServer = async (): Promise<void> => {
             log.info(`Server is running on port ${config.port}`, { env: config.NODE_ENV });
         });
 
-        // ───── Graceful Shutdown ─────
+        // ------ Graceful Shutdown ------
         const shutdown = async (signal: string) => {
             log.warn(`${signal} received. Shutting down gracefully...`);
             await stopOutboxProcessor();
@@ -50,7 +50,7 @@ const startServer = async (): Promise<void> => {
     }
 }
 
-// ───── Global Error Safety Nets ─────
+// ------ Global Error Safety Nets ------
 process.on("unhandledRejection", (reason: unknown) => {
     log.error(
         "Unhandled Promise Rejection",
@@ -60,7 +60,7 @@ process.on("unhandledRejection", (reason: unknown) => {
 });
 
 process.on("uncaughtException", (error: Error) => {
-    log.error("Uncaught Exception — process will exit", undefined, error);
+    log.error("Uncaught Exception - process will exit", undefined, error);
     process.exit(1);
 });
 

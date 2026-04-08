@@ -63,6 +63,32 @@ export class AuthController {
     }
 
     /**
+     * Handles instant Demo Account login.
+     * Sets refresh token cookie and redirects to client as an admin user.
+     * @param {Request} req - Express request
+     * @param {Response} res - Express response
+     * @param {NextFunction} next - Express next function
+     */
+    handleDemoLogin = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { refreshToken, accessToken } = await this.authService.handleDemoLogin();
+
+            res.cookie("refreshToken", refreshToken, {
+                httpOnly: true,
+                secure: config.NODE_ENV === "production",
+                sameSite: "strict",
+                maxAge: 1000 * 60 * 60 * 24 * 7,
+            });
+
+            log.info(`Demo login successful - Redirecting to app dashboard`);
+            res.redirect(`${config.client_uri}/login/success?accessToken=${accessToken}`);
+        } catch (error) {
+            log.error("Demo login failed internally", undefined, error instanceof Error ? error : undefined);
+            next(error);
+        }
+    }
+
+    /**
      * Logs user out: clears refresh token, session, and cookies.
      * @param {AuthRequest} req - Express request with authenticated user ID
      * @param {Response} res - Express response
@@ -128,10 +154,11 @@ export class AuthController {
 
     /**
      * Refreshes access token using the httpOnly refresh token cookie.
-     * Does NOT require a valid access token — reads from cookie instead.
+     * Does NOT require a valid access token - reads from cookie instead.
      */
     handleRefreshToken = async (req: Request, res: Response, next: NextFunction) => {
         try {
+
             const token = req.cookies?.refreshToken as string | undefined;
 
             if (!token) {

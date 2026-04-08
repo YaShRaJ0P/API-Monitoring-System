@@ -49,15 +49,15 @@ export class AuthRepository {
 
     /**
      * Creates a new tenant record.
-     * @param {Partial<ITenant>} data - Tenant data (email, google_id, name, avatar)
+     * @param {Partial<ITenant>} data - Tenant data (email, google_id, name, avatar, is_admin)
      * @returns {Promise<ITenant>} Newly created tenant
      */
     async createTenant(data: Partial<ITenant>): Promise<ITenant> {
         const result = await this.pgPool.query<ITenant>(
-            `INSERT INTO tenants (email, google_id, name, avatar) 
-             VALUES ($1, $2, $3, $4) 
+            `INSERT INTO tenants (email, google_id, name, avatar, is_admin) 
+             VALUES ($1, $2, $3, $4, $5) 
              RETURNING *`,
-            [data.email, data.google_id, data.name, data.avatar]
+            [data.email, data.google_id, data.name, data.avatar, data.is_admin ?? false]
         );
         return result.rows[0]!;
     }

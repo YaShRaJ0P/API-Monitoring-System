@@ -8,11 +8,11 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Filter,
+  RefreshCw,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -26,7 +26,35 @@ import { getLogs } from "@/api/metrics.api";
 import { computeDateRange } from "@/store/slices/filtersSlice";
 
 /**
- * Logs page — paginated raw event viewer with filters and CSV export.
+ * Returns the status badge class for an HTTP status code.
+ * @param {number} status
+ * @returns {string}
+ */
+function statusBadgeClass(status) {
+  if (status >= 500) return "badge-red";
+  if (status >= 400) return "badge-amber";
+  if (status >= 300) return "badge-cyan";
+  return "badge-green";
+}
+
+/**
+ * Returns the method badge class for an HTTP method.
+ * @param {string} method
+ * @returns {string}
+ */
+function methodBadgeClass(method) {
+  const map = {
+    GET: "badge-green",
+    POST: "badge-cyan",
+    PUT: "badge-amber",
+    PATCH: "badge-purple",
+    DELETE: "badge-red",
+  };
+  return map[method] || "badge-muted";
+}
+
+/**
+ * Logs page - paginated raw event viewer with filters and CSV export.
  */
 export default function Logs() {
   const [errorOnly, setErrorOnly] = useState(false);
@@ -36,10 +64,10 @@ export default function Logs() {
   const [methodFilter, setMethodFilter] = useState("all");
 
   const { timeRange, environment } = useSelector((state) => state.filters);
+  const { activeProjectId } = useSelector((state) => state.auth);
   const { startDate, endDate } = computeDateRange(timeRange);
   const envFilter = environment !== "all" ? environment : undefined;
 
-  // Debounce search input (300ms)
   const debounceTimer = useCallback(
     (() => {
       let timer;
@@ -64,12 +92,14 @@ export default function Logs() {
     endDate,
     page,
     limit: 25,
+    project_id: activeProjectId,
     ...(envFilter && { environment: envFilter }),
     ...(debouncedSearch && { endpoint: debouncedSearch }),
     ...(methodFilter !== "all" && { method: methodFilter }),
+    ...(errorOnly && { errorOnly: true }),
   };
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: [
       "logs",
       timeRange,
@@ -78,17 +108,15 @@ export default function Logs() {
       debouncedSearch,
       methodFilter,
       errorOnly,
+      activeProjectId,
     ],
     queryFn: () => getLogs(queryParams),
     staleTime: 5000,
   });
 
-  // Filter errors client-side for the toggle
   const logs = useMemo(() => {
-    if (!data?.data) return [];
-    if (errorOnly) return data.data.filter((log) => log.status >= 400);
-    return data.data;
-  }, [data, errorOnly]);
+    return data?.data || [];
+  }, [data]);
 
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / 25);
@@ -126,53 +154,54 @@ export default function Logs() {
     URL.revokeObjectURL(url);
   };
 
-  /**
-   * Returns a color class based on HTTP status code.
-   * @param {number} status
-   * @returns {string}
-   */
-  const statusColor = (status) => {
-    if (status >= 500) return "bg-red-500/10 text-red-500";
-    if (status >= 400) return "bg-amber-500/10 text-amber-500";
-    if (status >= 300) return "bg-blue-500/10 text-blue-500";
-    return "bg-emerald-500/10 text-emerald-500";
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Logs</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold text-white tracking-tight">Logs</h1>
+          <p className="text-sm text-slate-500 mt-1">
             Raw API event log viewer with filters and export.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportCSV}
-          className="gap-2 self-start"
-        >
-          <Download className="size-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-2 self-start h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-400/30 text-slate-300 text-sm font-medium transition-all"
+            variant="ghost"
+          >
+            <RefreshCw
+              className={cn("size-3.5", isFetching && "animate-spin")}
+            />
+            Refresh
+          </Button>
+          <Button
+            onClick={handleExportCSV}
+            disabled={!logs.length}
+            className="gap-2 self-start h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-400/30 text-slate-300 text-sm font-medium transition-all"
+            variant="ghost"
+          >
+            <Download className="size-3.5" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* All / Errors toggle */}
-        <div className="flex rounded-lg border overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2">
+        {/* All / Errors toggle pills */}
+        <div className="flex rounded-xl overflow-hidden border border-white/8 bg-[#111118]">
           <button
             onClick={() => {
               setErrorOnly(false);
               setPage(1);
             }}
             className={cn(
-              "px-3 py-1.5 text-sm font-medium transition-colors",
+              "px-4 py-1.5 text-xs font-medium transition-all duration-200",
               !errorOnly
-                ? "bg-primary text-primary-foreground"
-                : "bg-card hover:bg-accent",
+                ? "bg-cyan-400 text-[#09090e] font-semibold"
+                : "text-slate-400 hover:text-slate-200",
             )}
           >
             All Logs
@@ -183,26 +212,28 @@ export default function Logs() {
               setPage(1);
             }}
             className={cn(
-              "px-3 py-1.5 text-sm font-medium transition-colors",
+              "px-4 py-1.5 text-xs font-medium transition-all duration-200",
               errorOnly
-                ? "bg-destructive text-destructive-foreground"
-                : "bg-card hover:bg-accent",
+                ? "bg-rose-500 text-white font-semibold"
+                : "text-slate-400 hover:text-slate-200",
             )}
           >
             Errors Only
           </button>
         </div>
 
+        {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-500" />
           <Input
             placeholder="Search endpoint..."
             value={searchTerm}
             onChange={handleSearch}
-            className="pl-9 h-9"
+            className="pl-9 h-9 text-xs bg-white/5 border-white/10 focus:border-cyan-400/30 focus:ring-cyan-400/10 placeholder:text-slate-600 rounded-xl"
           />
         </div>
 
+        {/* Method filter */}
         <Select
           value={methodFilter}
           onValueChange={(v) => {
@@ -210,10 +241,11 @@ export default function Logs() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[110px] h-9 text-xs">
+          <SelectTrigger className="w-[110px] h-9 text-xs bg-white/5 border-white/10 hover:border-cyan-400/30 rounded-xl">
+            <Filter className="size-3 mr-1 text-slate-500 shrink-0" />
             <SelectValue placeholder="Method" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-[#16161f] border-white/10">
             <SelectItem value="all">All Methods</SelectItem>
             <SelectItem value="GET">GET</SelectItem>
             <SelectItem value="POST">POST</SelectItem>
@@ -225,105 +257,130 @@ export default function Logs() {
       </div>
 
       {/* Table */}
-      <Card className="border-none shadow-md bg-card/80 backdrop-blur-xl">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full rounded" />
-              ))}
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <ScrollText className="size-10 text-muted-foreground/50 mb-3" />
-              <p className="text-muted-foreground text-sm">
-                No logs found for the current filters.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/50 border-b">
-                    <th className="text-left p-3 font-medium">Timestamp</th>
-                    <th className="text-left p-3 font-medium">Service</th>
-                    <th className="text-left p-3 font-medium">Endpoint</th>
-                    <th className="text-left p-3 font-medium">Method</th>
-                    <th className="text-left p-3 font-medium">Status</th>
-                    <th className="text-right p-3 font-medium">Latency</th>
-                    <th className="text-left p-3 font-medium hidden lg:table-cell">
-                      Error
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {logs.map((log, i) => (
-                    <tr key={i} className="hover:bg-muted/30 transition-colors">
-                      <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {format(new Date(log.timestamp), "MMM dd, HH:mm:ss")}
-                      </td>
-                      <td className="p-3 font-medium text-xs">{log.service}</td>
-                      <td className="p-3 font-mono text-xs max-w-[200px] truncate">
+      <div className="relative rounded-2xl bg-[#111118] border border-white/5 overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/30 to-transparent" />
+        {isLoading ? (
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full bg-white/5 rounded-lg" />
+            ))}
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <ScrollText className="size-10 text-slate-700 mb-3" />
+            <p className="text-slate-500 text-sm">
+              No logs found for the current filters.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-white/5">
+                  <th className="text-left p-3 pl-4 font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                    Timestamp
+                  </th>
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Service
+                  </th>
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Endpoint
+                  </th>
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Method
+                  </th>
+                  <th className="text-left p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="text-right p-3 font-medium text-slate-500 uppercase tracking-wider">
+                    Latency
+                  </th>
+                  <th className="text-left p-3 pr-4 font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">
+                    Error
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log, i) => (
+                  <tr
+                    key={i}
+                    className="border-b border-white/5 hover:bg-white/3 transition-colors group border-l-2 border-l-transparent hover:border-l-cyan-400/40"
+                  >
+                    <td className="p-3 pl-4 text-slate-500 whitespace-nowrap mono">
+                      {format(new Date(log.timestamp), "MMM dd, HH:mm:ss")}
+                    </td>
+                    <td className="p-3 font-medium text-slate-300">
+                      {log.service}
+                    </td>
+                    <td className="p-3 max-w-[200px] truncate">
+                      <span
+                        className="mono text-slate-400 group-hover:text-slate-200 transition-colors"
+                        title={log.endpoint}
+                      >
                         {log.endpoint}
-                      </td>
-                      <td className="p-3">
-                        <Badge variant="outline" className="text-xs font-mono">
-                          {log.method}
-                        </Badge>
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={cn(
-                            "text-xs font-medium px-2 py-0.5 rounded-full",
-                            statusColor(log.status),
-                          )}
-                        >
-                          {log.status}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right text-muted-foreground text-xs">
-                        {Math.round(log.latency)}ms
-                      </td>
-                      <td className="p-3 text-xs text-red-500 max-w-[200px] truncate hidden lg:table-cell">
-                        {log.error || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={cn(
+                          "badge mono",
+                          methodBadgeClass(log.method),
+                        )}
+                      >
+                        {log.method}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={cn(
+                          "badge mono",
+                          statusBadgeClass(log.status_code || log.status),
+                        )}
+                      >
+                        {log.status_code || log.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right mono text-slate-400">
+                      {Math.round(log.latency)}ms
+                    </td>
+                    <td className="p-3 pr-4 text-rose-400/80 max-w-[200px] truncate hidden lg:table-cell mono">
+                      {log.error || <span className="text-slate-700">-</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <p className="text-xs text-muted-foreground">
-                Page {page} of {totalPages} ({total} total)
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-white/5">
+            <p className="text-xs text-slate-500">
+              Page {page} of {totalPages} ·{" "}
+              <span className="text-slate-400">
+                {total.toLocaleString()} events
+              </span>
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                className="size-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                <ChevronLeft className="size-3.5" />
+              </button>
+              <button
+                className="size-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight className="size-3.5" />
+              </button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

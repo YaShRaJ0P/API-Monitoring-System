@@ -1,58 +1,90 @@
-import { Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { getGoogleOAuthUrl } from "@/api/auth.api";
+import { getGoogleOAuthUrl, getDemoLoginUrl } from "@/api/auth.api";
+import { Zap } from "lucide-react";
+import { config } from "@/config";
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
 
 /**
  * Login page with Google OAuth sign-in.
- * Redirects the browser to the server's Google OAuth endpoint.
+ * Redirects to the app if the user is already authenticated.
  */
 export default function Login() {
+  const { isAuthenticated, loading, projects } = useSelector((state) => state.auth);
+
+  // Redirect authenticated users away from /login
+  if (!loading && isAuthenticated) {
+    if (projects && projects.length > 0) {
+      return <Navigate to="/" replace />;
+    }
+    return <Navigate to="/onboarding" replace />;
+  }
+
   const handleGoogleLogin = () => {
     window.location.href = getGoogleOAuthUrl();
   };
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Decorative background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 size-80 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 size-80 bg-primary/5 rounded-full blur-3xl" />
-      </div>
+  const handleDemoLogin = () => {
+    window.location.href = getDemoLoginUrl();
+  };
 
-      <div className="w-full max-w-md relative animate-in fade-in slide-in-from-bottom-6 duration-700">
-        <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl">
-          <CardContent className="p-8 sm:p-10">
-            {/* Logo */}
-            <div className="flex flex-col items-center mb-8">
-              <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                <Activity className="size-8 text-primary" />
+  return (
+    <div className="relative min-h-screen w-full bg-[#09090e] flex items-center justify-center p-4 overflow-hidden dark">
+      {/* Ambient background glows */}
+      <div className="absolute size-[600px] rounded-full bg-cyan-500 blur-[160px] opacity-10 -top-48 -right-48 pointer-events-none" />
+      <div className="absolute size-[500px] rounded-full bg-violet-600 blur-[160px] opacity-10 bottom-0 -left-48 pointer-events-none" />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34,211,238,0.07), transparent)",
+        }}
+      />
+
+      {/* Card */}
+      <div
+        className="relative w-full max-w-sm animate-in fade-in slide-in-from-bottom-6 duration-700"
+        style={{ animationDelay: "100ms" }}
+      >
+        {/* Gradient border effect */}
+        <div className="p-px rounded-2xl bg-linear-to-b from-white/10 to-white/5">
+          <div className="relative rounded-2xl bg-[#111118]/90 backdrop-blur-xl p-8">
+            {/* Logo & heading */}
+            <div className="flex flex-col items-center text-center mb-8">
+              <div className="relative mb-4">
+                <div className="absolute inset-0 rounded-2xl bg-cyan-400/20 blur-xl" />
+                <img
+                  src={config.logo}
+                  className="relative size-14 rounded-xl"
+                  alt="logo"
+                />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight">Antigravity</h1>
-              <p className="text-muted-foreground text-sm mt-1">
-                API Monitoring System
+              <h1 className="text-xl font-bold text-white tracking-tight">
+                {config.name}
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                API Monitoring &amp; Observability
               </p>
             </div>
 
             {/* Divider */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+                <span className="w-full border-t border-white/8" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
+              <div className="relative flex justify-center">
+                <span className="bg-[#111118] px-3 text-xs text-slate-500 uppercase tracking-widest">
                   Sign in to continue
                 </span>
               </div>
             </div>
 
             {/* Google OAuth Button */}
-            <Button
+            <button
               onClick={handleGoogleLogin}
-              variant="outline"
-              className="w-full h-12 text-sm font-medium rounded-xl border-border hover:bg-accent transition-all duration-200"
+              className="w-full flex items-center justify-center gap-3 h-11 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-400/30 text-sm font-medium text-slate-200 transition-all duration-200 group"
             >
-              <svg className="mr-3 size-5" viewBox="0 0 24 24">
+              <svg className="size-4 shrink-0" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                   fill="#4285F4"
@@ -71,15 +103,31 @@ export default function Login() {
                 />
               </svg>
               Continue with Google
-            </Button>
+            </button>
+
+            {/* Primary CTA pulse */}
+            <div className="mt-3">
+              <Button
+                onClick={handleDemoLogin}
+                className="w-full h-11 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-[#09090e] font-semibold text-sm pulse-cyan transition-all duration-200 gap-2"
+              >
+                <Zap className="size-4" /> Explore Live Demo
+              </Button>
+            </div>
 
             {/* Footer */}
-            <p className="text-center text-xs text-muted-foreground mt-6">
-              By signing in, you agree to our Terms of Service and Privacy
-              Policy.
+            <p className="text-center text-xs text-slate-600 mt-6 leading-relaxed">
+              By signing in, you agree to our{" "}
+              <span className="text-slate-400 hover:text-cyan-400 cursor-pointer transition-colors">
+                Terms
+              </span>{" "}
+              and{" "}
+              <span className="text-slate-400 hover:text-cyan-400 cursor-pointer transition-colors">
+                Privacy Policy
+              </span>
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

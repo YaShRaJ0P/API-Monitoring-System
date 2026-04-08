@@ -1,4 +1,4 @@
-import client from "./client";
+import client, { executeRefreshToken } from "./client";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
 
@@ -8,14 +8,15 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
  * @returns {string} Google OAuth initiation URL
  */
 export const getGoogleOAuthUrl = () => `${API_URL}/auth/google`;
+export const getDemoLoginUrl = () => `${API_URL}/auth/demo`;
 
 /**
  * Fetches the authenticated user's profile.
  * @returns {Promise<object>} User profile data
  */
 export const getMe = async () => {
-    const { data } = await client.get("/auth/me");
-    return data.data;
+    const res = await client.get("/auth/me");
+    return res.data;
 };
 
 /**
@@ -23,8 +24,8 @@ export const getMe = async () => {
  * @returns {Promise<string>} New access token
  */
 export const refreshToken = async () => {
-    const { data } = await client.post("/auth/refresh-token");
-    return data.data?.accessToken;
+    const res = await executeRefreshToken();
+    return res.data?.accessToken;
 };
 
 /**

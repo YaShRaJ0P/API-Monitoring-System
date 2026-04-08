@@ -18,7 +18,7 @@ const BASE_DELAY_MS = 5000; //5s
  * @param {number} retryCount - Current retry attempt
  * @returns {number} Delay in milliseconds
  */
-const getBackoffTime = (retryCount: number) =>
+const getBackoffTime = (retryCount: number): number =>
     BASE_DELAY_MS * Math.pow(2, retryCount);
 
 /**
@@ -52,7 +52,7 @@ const sendToDLQ = async (
     content: unknown,
     error: unknown,
     retryCount: number,
-) => {
+): Promise<void> => {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     const failedMessage = {
@@ -90,7 +90,7 @@ const sendToDLQ = async (
  * @param {ConsumeMessage | null} msg - RabbitMQ message or null
  * @returns {Promise<void>}
  */
-const processMessage = async (channel: Channel, processingService: ProcessingService, msg: ConsumeMessage | null) => {
+const processMessage = async (channel: Channel, processingService: ProcessingService, msg: ConsumeMessage | null): Promise<void> => {
     if (!msg) return;
 
     let content;
@@ -117,14 +117,12 @@ const processMessage = async (channel: Channel, processingService: ProcessingSer
 
     try {
         // Business logic
-        log.debug(`Processing telemetry: ${content.event_id}`);
         await processingService.processTelemetry(validationResult.data);
         channel.ack(msg);
     } catch (error) {
         log.error("Processing failed", undefined, error instanceof Error ? error : undefined);
 
         if (retryCount < MAX_RETRIES) {
-            // Send to retry queue with backoff (manual DLX via TTL)
             sendToRetryQueue(channel, content, retryCount);
             channel.ack(msg); // Ack original message so it doesn't loop instantly
         } else {
@@ -139,14 +137,28 @@ const processMessage = async (channel: Channel, processingService: ProcessingSer
 
 /**
  * Creates and starts the telemetry consumer.
- * @param {ProcessingService} processingService - Injected processing service
+ * @param {ProcessingService} processingService
  */
 export const createTelemetryConsumer = async (processingService: ProcessingService) => {
-    const channel = await RabbitMQ.getChannel();
+    const setupConsumer = async (channel: Channel) => {
+        try {
+            await channel.prefetch(1);
+            await channel.consume(QUEUES.TELEMETRY, (msg) => {
+                return processMessage(channel, processingService, msg);
+            });
+            log.info("Telemetry consumer started");
+        } catch (error) {
+            log.error("Failed to setup telemetry consumer", undefined, error instanceof Error ? error : undefined);
+        }
+    };
 
-    await channel.prefetch(1);
+    // Initial setup
+    const initialChannel = await RabbitMQ.getChannel();
+    await setupConsumer(initialChannel);
 
-    await channel.consume(QUEUES.TELEMETRY, (msg) => processMessage(channel, processingService, msg));
-
-    log.info("Telemetry consumer started");
+    // Listen for re-connections to re-subscribe
+    RabbitMQ.emitter.on("reconnect", async (newChannel: Channel) => {
+        log.info("RabbitMQ reconnected, re-subscribing telemetry consumer...");
+        await setupConsumer(newChannel);
+    });
 };
