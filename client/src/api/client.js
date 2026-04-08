@@ -1,4 +1,5 @@
 import axios from "axios";
+import { config } from "@/config";
 
 /**
  * In-memory access token storage.
@@ -24,7 +25,7 @@ export const getAccessToken = () => accessToken;
  * - Credentials (cookies) sent with every request for refresh-token flow
  */
 const client = axios.create({
-    baseURL: "https://monito-api-hrtu4.ondigitalocean.app/api/v1",
+    baseURL: config.base_uri,
     withCredentials: true,
     headers: { "Content-Type": "application/json" },
 });

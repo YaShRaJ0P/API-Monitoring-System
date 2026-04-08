@@ -1,14 +1,13 @@
 import client, { executeRefreshToken } from "./client";
-
-const API_URL = import.meta.env.VITE_API_URL || "https://api-monitoring-system-nine.vercel.app/api/v1";
+import { config } from "@/config";
 
 /**
  * Returns the full Google OAuth login URL on the server.
  * The browser navigates here to start the OAuth flow.
  * @returns {string} Google OAuth initiation URL
  */
-export const getGoogleOAuthUrl = () => `${API_URL}/auth/google`;
-export const getDemoLoginUrl = () => `${API_URL}/auth/demo`;
+export const getGoogleOAuthUrl = () => `${config.base_uri}/auth/google`;
+export const getDemoLoginUrl = () => `${config.base_uri}/auth/demo`;
 
 /**
  * Fetches the authenticated user's profile.
