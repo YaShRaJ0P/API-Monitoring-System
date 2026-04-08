@@ -1,6 +1,6 @@
 import client, { executeRefreshToken } from "./client";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+const API_URL = import.meta.env.VITE_API_URL || "https://api-monitoring-system-nine.vercel.app/api/v1";
 
 /**
  * Returns the full Google OAuth login URL on the server.

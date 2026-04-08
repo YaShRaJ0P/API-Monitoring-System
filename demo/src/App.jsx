@@ -12,10 +12,7 @@ import {
   Clock,
   ChevronRight,
   RefreshCw,
-  CheckCircle2,
   AlertTriangle,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 
 const API_BASE = "http://localhost:4000";
