@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { config } from '../../config/config';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -10,7 +11,7 @@ const ENCODING = 'base64' as const;
  * @returns {Buffer} 32-byte AES key
  */
 function getKey(): Buffer {
-    const raw = process.env.ENCRYPTION_KEY;
+    const raw = config.encryptionKey;
     if (!raw) {
         throw new Error('[Monito] ENCRYPTION_KEY is not set in environment variables.');
     }

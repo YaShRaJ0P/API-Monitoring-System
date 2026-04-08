@@ -69,6 +69,7 @@ export const config = {
         fromAddress: process.env.SMTP_FROM_ADDRESS || "alerts@apimonito.sys",
     },
 
+    encryptionKey: process.env.ENCRYPTION_KEY,
 
     worker: {
         alert: {

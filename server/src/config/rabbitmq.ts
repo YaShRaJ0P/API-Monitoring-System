@@ -74,7 +74,8 @@ export class RabbitMQ {
             } catch (error) {
                 this.reset();
                 const delay = Math.min(1000 * Math.pow(2, this.retryCount), 30000);
-
+                this.retryCount += 1;
+                
                 if (this.retryCount < 10) {
                     log.error(`Connection failed, retrying in ${delay}ms...`, { attempt: this.retryCount + 1 });
                     await new Promise(resolve => setTimeout(resolve, delay));
