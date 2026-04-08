@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import { Copy, Check, Key, ExternalLink, Settings } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 /**
@@ -69,14 +69,14 @@ app.use("/api/users", monito.service("user-service"), usersRouter);`;
             Integrate the monitoring SDK or send events via HTTP.
           </p>
         </div>
-        <a
-          href={`/${projectSlug}/settings`}
+        <Link
+          to={`/${projectSlug}/settings`}
           className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors border border-white/10 rounded-xl px-3 py-2 hover:border-cyan-400/20"
         >
           <Settings className="size-3.5" />
           Manage Projects &amp; API Keys
           <ExternalLink className="size-3" />
-        </a>
+        </Link>
       </div>
 
       {/* API Key and Secret panel */}

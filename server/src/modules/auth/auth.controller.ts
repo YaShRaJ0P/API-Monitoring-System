@@ -50,7 +50,7 @@ export class AuthController {
                 res.cookie("refreshToken", refreshToken, {
                     httpOnly: true,
                     secure: config.NODE_ENV === "production",
-                    sameSite: "strict",
+                    sameSite: config.NODE_ENV === "production" ? "none" : "lax",
                     maxAge: 1000 * 60 * 60 * 24 * 7,
                 });
 
@@ -76,7 +76,7 @@ export class AuthController {
             res.cookie("refreshToken", refreshToken, {
                 httpOnly: true,
                 secure: config.NODE_ENV === "production",
-                sameSite: "strict",
+                sameSite: config.NODE_ENV === "production" ? "none" : "lax",
                 maxAge: 1000 * 60 * 60 * 24 * 7,
             });
 
@@ -104,7 +104,7 @@ export class AuthController {
             res.clearCookie('refreshToken', {
                 httpOnly: true,
                 secure: config.NODE_ENV === "production",
-                sameSite: 'strict',
+                sameSite: config.NODE_ENV === "production" ? "none" : "lax",
             });
 
             // If session exists, destroy it and call passport logout
@@ -183,7 +183,7 @@ export class AuthController {
             res.cookie("refreshToken", tokens.refreshToken, {
                 httpOnly: true,
                 secure: config.NODE_ENV === "production",
-                sameSite: "strict",
+                sameSite: config.NODE_ENV === "production" ? "none" : "lax",
                 maxAge: 1000 * 60 * 60 * 24 * 7,
             });
 

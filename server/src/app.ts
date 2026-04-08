@@ -30,6 +30,7 @@ import { apiKeyLimiter } from "./shared/middleware/apiKeyRateLimit.middleware.js
  */
 export function createApp() {
     const app = express();
+    app.set("trust proxy", 1);
 
     // ------ Core Middleware ------
     app.use(cors(config.cors))
@@ -46,6 +47,7 @@ export function createApp() {
         saveUninitialized: false,
         cookie: {
             secure: config.NODE_ENV === "production",
+            sameSite: config.NODE_ENV === "production" ? "none" : "lax",
             maxAge: 1000 * 60 * 60 * 24 * 7,
         }
     }))

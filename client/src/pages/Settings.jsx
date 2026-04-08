@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   User,
   FolderOpen,
@@ -51,7 +51,6 @@ export default function Settings() {
   const [deleting, setDeleting] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
 
-  const activeProject = projects.find((p) => p.id === activeProjectId);
 
   const handleCopy = (keyType, text) => {
     navigator.clipboard.writeText(text);
@@ -358,13 +357,13 @@ export default function Settings() {
               </p>
             </div>
           </div>
-          <a
-            href={`/${projectSlug}/integration`}
+          <Link
+            to={`/${projectSlug}/integration`}
             className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
           >
             View docs
             <ChevronRight className="size-3.5" />
-          </a>
+          </Link>
         </div>
       </div>
     </div>

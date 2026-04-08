@@ -2,6 +2,8 @@ import express, { json } from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import { MonitoAPI } from "monito-api";
+import dotenv from "dotenv";
+dotenv.config();
 
 const app = express();
 const PORT = 4000;
@@ -9,7 +11,7 @@ const PORT = 4000;
 app.use(json());
 app.use(cookieParser());
 app.use(cors({
-  origin: "http://localhost:5174",
+  origin: process.env.BASE_URI,
   credentials: true,
 }));
 
@@ -157,5 +159,5 @@ app.all("/api/echo", serviceLabel("echo-service"), (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`[monito] Backend Demo running → http://localhost:${PORT}`);
+  console.log(`[monito] Backend Demo running`);
 });

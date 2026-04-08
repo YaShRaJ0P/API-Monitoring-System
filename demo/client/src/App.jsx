@@ -3,7 +3,6 @@ import axios from "axios";
 import {
   Zap,
   ShieldCheck,
-  Settings,
   Server,
   Activity,
   Trash2,
@@ -15,7 +14,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-const API_BASE = "http://localhost:4000";
+const API_BASE = import.meta.env.SERVER_URI;
 
 //  Helpers
 
@@ -46,7 +45,7 @@ export default function App() {
   const [setup, setSetup] = useState({
     apiKey: "",
     apiSecret: "",
-    monitorUrl: "https://monito-api-hrtu4.ondigitalocean.app/",
+    monitorUrl: import.meta.env.BASE_URI,
   });
   const [setupErr, setSetupErr] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);

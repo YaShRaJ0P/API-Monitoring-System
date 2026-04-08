@@ -1,5 +1,5 @@
 export const config = {
-    logo: "./public/logo.svg",
+    logo: "/logo.svg",
     name: "MonitoApi",
-    base_uri: "https://monito-api-hrtu4.ondigitalocean.app/api/v1"
+    base_uri: import.meta.env.VITE_APP_BASE_URI
 };

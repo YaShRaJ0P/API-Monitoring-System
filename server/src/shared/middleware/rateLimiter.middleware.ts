@@ -24,7 +24,7 @@ export const globalLimiter = rateLimit({
     skip: (req) => {
         if (req.path === "/health") return true;
         if (req.path.includes("/ingest")) return true;
-
+        if (req.path.includes("/auth")) return true;
         return false;
     },
 });
@@ -34,7 +34,7 @@ export const globalLimiter = rateLimit({
  */
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20,
+    max: 25,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
