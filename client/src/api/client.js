@@ -21,11 +21,10 @@ export const getAccessToken = () => accessToken;
 
 /**
  * Axios instance pre-configured for the API.
- * - BaseURL from env or defaults to localhost:3000
  * - Credentials (cookies) sent with every request for refresh-token flow
  */
 const client = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1",
+    baseURL: "https://monito-api-hrtu4.ondigitalocean.app/api/v1",
     withCredentials: true,
     headers: { "Content-Type": "application/json" },
 });

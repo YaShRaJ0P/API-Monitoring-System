@@ -25,7 +25,7 @@ app.use((req, res, next) => {
     activeSdk = new MonitoAPI({
       apiKey: req.cookies.monito_apiKey,
       apiSecret: req.cookies.monito_apiSecret,
-      serverUrl: req.cookies.monito_url || "http://localhost:3000",
+      serverUrl: req.cookies.monito_url || "https://monito-api-hrtu4.ondigitalocean.app/",
       environment: "development",
       excludePaths: ["/health", "/config"],
       batchSize: 1, // Flush instantly for demo purposes
@@ -60,7 +60,7 @@ app.post("/config", (req, res) => {
     return res.status(400).json({ success: false, message: "Missing credentials" });
   }
 
-  const url = monitorUrl?.trim() || "http://localhost:3000";
+  const url = monitorUrl?.trim() || "https://monito-api-hrtu4.ondigitalocean.app/";
 
   if (activeSdk) activeSdk.destroy();
 

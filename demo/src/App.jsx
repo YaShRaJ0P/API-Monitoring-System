@@ -49,7 +49,7 @@ export default function App() {
   const [setup, setSetup] = useState({
     apiKey: "",
     apiSecret: "",
-    monitorUrl: "http://localhost:3000",
+    monitorUrl: "https://monito-api-hrtu4.ondigitalocean.app/",
   });
   const [setupErr, setSetupErr] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
