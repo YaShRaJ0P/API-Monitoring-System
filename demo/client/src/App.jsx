@@ -57,7 +57,7 @@ export default function App() {
 
   const checkHealth = async () => {
     try {
-      const { data } = await axios.get(`${API_BASE}/health`, {
+      const { data } = await axios.get(`${API_BASE}/api/v1/health`, {
         withCredentials: true,
       });
       setPhase(data.configured ? "ready" : "setup");

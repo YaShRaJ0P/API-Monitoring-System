@@ -19,9 +19,10 @@ export default ({ mode }) => {
     server: {
       proxy: {
         "/api": {
-          target: env.VITE_APP_BASE_URI,
+          target: env.VITE_APP_SERVER_URI,
           changeOrigin: true,
-          secure: false,
+          rewrite: (path) => path.replace(/^\/api/, "/api/v1"),
+          secure: true,
         },
       },
     },

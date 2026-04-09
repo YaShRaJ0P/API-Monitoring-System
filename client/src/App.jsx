@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,7 +10,6 @@ import { OnboardingGuard } from "@/components/layout/OnboardingGuard";
 import { ProjectLayout } from "@/components/layout/ProjectLayout";
 import { Shell } from "@/components/layout/Shell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { getAccessToken } from "@/api/client";
 
 // ---- Pages ----
 import Login from "@/pages/Login";
@@ -39,23 +38,12 @@ const queryClient = new QueryClient({
  */
 export default function App() {
   const dispatch = useDispatch();
-  const accessToken = getAccessToken();
-  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
- const [initialized, setInitialized] = useState(false);
 
- useEffect(() => {
-   if (initialized) return;
-
-   const isOAuthCallback =
-     window.location.pathname.startsWith("/login/success");
-
-   if (isOAuthCallback || isAuthenticated || accessToken) {
-     setInitialized(true);
-     return;
-   }
-
-   dispatch(initializeAuth()).finally(() => setInitialized(true));
- }, [dispatch, isAuthenticated, accessToken, initialized]);
+  useEffect(() => {
+    if (!window.location.pathname.startsWith("/login/success")) {
+      dispatch(initializeAuth());
+    }
+  }, [dispatch]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -7,8 +7,8 @@ import { config } from "@/config";
  * @returns {string} Google OAuth initiation URL
  */
 
-export const getGoogleOAuthUrl = () => `${config.base_uri}/auth/google`;
-export const getDemoLoginUrl = () => `${config.base_uri}/auth/demo`;
+export const getGoogleOAuthUrl = () => `${config.server_uri}/api/v1/auth/google`;
+export const getDemoLoginUrl = () => `${config.server_uri}/api/v1/auth/demo`;
 
 /**
  * Fetches the authenticated user's profile.
