@@ -41,13 +41,17 @@ export default function App() {
   const dispatch = useDispatch();
   const accessToken = getAccessToken();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const isOAuthCallback = window.location.pathname.startsWith("/login/success");
+
+  const loading = useSelector((state) => state.auth.loading);
 
   useEffect(() => {
-    const isOAuthCallback =
-      window.location.pathname.startsWith("/login/success");
+    if (loading) return; // ✅ WAIT for auth state to settle
+
     if (isOAuthCallback || isAuthenticated || accessToken) return;
+
     dispatch(initializeAuth());
-  }, [dispatch]);
+  }, [dispatch, loading, isAuthenticated, accessToken]);
 
   return (
     <QueryClientProvider client={queryClient}>
