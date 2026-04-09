@@ -2,7 +2,9 @@ import type { Request, Response, NextFunction } from "express";
 import type { AuthRequest } from "../types/auth.types.js";
 import { verifyAccessToken } from "../utils/jwt.js";
 import { AppError } from "../errors/AppError.js";
-import { logger } from "../utils/logger.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("AuthMiddleware");
 
 /**
  * Protects routes by validating the Bearer access token.
@@ -15,11 +17,15 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
     try {
         const authHeader = req.headers.authorization;
 
+        log.info("[DEBUG] authHeader : ", authHeader);
+
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
             throw new AppError(401, "Access token is missing or malformed");
         }
 
         const token = authHeader.split(" ")[1];
+
+        log.info("[DEBUG] access token : ", token);
 
         if (!token) {
             throw new AppError(401, "Access token is missing");

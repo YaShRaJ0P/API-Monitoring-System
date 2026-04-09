@@ -178,7 +178,7 @@ export default function App() {
       setPhase("ready");
     } catch {
       setSetupErr(
-        "Could not reach the demo server. Make sure it's running on port 4000.",
+        "Could not reach the demo server.",
       );
     } finally {
       setSetupBusy(false);

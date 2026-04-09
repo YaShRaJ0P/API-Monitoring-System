@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { subHours, formatISO } from "date-fns";
+import { subHours } from "date-fns";
 
 /**
  * Predefined time range options.

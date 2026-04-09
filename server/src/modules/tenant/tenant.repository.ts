@@ -1,8 +1,11 @@
 import type { Pool } from "pg";
-import type { ITenant, IProject } from "./tenant.entity.js";
+import type { IProject } from "./tenant.entity.js";
 
 import crypto from "crypto";
 import { encryptSecret, decryptSecret } from "../../shared/utils/crypto.js";
+import { createLogger } from "../../shared/utils/logger.js";
+
+const log = createLogger("TenantRepository");
 
 /**
  * Repository for tenant and project database operations.
@@ -21,7 +24,7 @@ export class TenantRepository {
         const rawSecret   = crypto.randomBytes(32).toString('hex');
         const storedSecret = encryptSecret(rawSecret);
 
-        console.log("[DEBUG] Secret Length, : ", storedSecret.length);
+        log.info("[DEBUG] Secret Length, : ", storedSecret.length);
 
         const result = await this.pool.query<IProject>(
             `INSERT INTO projects (tenant_id, name, api_secret)

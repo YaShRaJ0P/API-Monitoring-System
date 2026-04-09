@@ -10,7 +10,7 @@ import type { StringValue } from "ms";
  * @param {string} user.email - Tenant email address
  * @returns {{ accessToken: string, refreshToken: string }} Token pair
  */
-export const generateTokens = (user: { id: string; email: string }) => {
+export const generateTokens = (user: { id: string; email: string }): { accessToken: string; refreshToken: string; } => {
     const accessOptions: SignOptions = {
         expiresIn: config.jwt.access_token_expiry as StringValue | number,
     };
@@ -40,8 +40,19 @@ export const generateTokens = (user: { id: string; email: string }) => {
  * @returns {jwt.JwtPayload | string} Decoded token payload
  * @throws {JsonWebTokenError} If the token is invalid or expired
  */
-export const verifyAccessToken = (token: string) => {
-    return jwt.verify(token, config.jwt.access_token_secret!);
+export const verifyAccessToken = (token: string): jwt.JwtPayload | string => {
+    try {
+        return jwt.verify(token, config.jwt.access_token_secret!);
+    } catch (error: any) {
+        if (error.name === "TokenExpiredError") {
+            console.warn(`[DEBUG] JWT Access Token Expired at ${error.expiredAt}`);
+        } else if (error.name === "JsonWebTokenError") {
+            console.error(`[DEBUG] JWT Access Token Invalid Signature: ${error.message}`);
+        } else {
+            console.error(`[DEBUG] JWT Access Token Verification Failed: ${error.message}`);
+        }
+        throw error;
+    }
 };
 
 /**
@@ -50,6 +61,6 @@ export const verifyAccessToken = (token: string) => {
  * @returns {jwt.JwtPayload | string} Decoded token payload
  * @throws {JsonWebTokenError} If the token is invalid or expired
  */
-export const verifyRefreshToken = (token: string) => {
+export const verifyRefreshToken = (token: string): jwt.JwtPayload | string => {
     return jwt.verify(token, config.jwt.refresh_token_secret!);
 };

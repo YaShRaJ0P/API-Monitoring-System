@@ -7,7 +7,6 @@ import { config } from "@/config";
  * @returns {string} Google OAuth initiation URL
  */
 
-console.log(config.base_uri)
 export const getGoogleOAuthUrl = () => `${config.base_uri}/auth/google`;
 export const getDemoLoginUrl = () => `${config.base_uri}/auth/demo`;
 

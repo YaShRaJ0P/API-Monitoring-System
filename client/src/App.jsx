@@ -10,6 +10,7 @@ import { OnboardingGuard } from "@/components/layout/OnboardingGuard";
 import { ProjectLayout } from "@/components/layout/ProjectLayout";
 import { Shell } from "@/components/layout/Shell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { getAccessToken } from "@/api/client";
 
 // ---- Pages ----
 import Login from "@/pages/Login";
@@ -35,25 +36,17 @@ const queryClient = new QueryClient({
 
 /**
  * Root application component.
- * Sets up providers (React Query, Tooltip, Toaster),
- * initializes auth on mount, and defines all routes.
- *
- * Route hierarchy:
- *   /                   → ProjectRedirect (picks first project, navigates to /:name/dashboard)
- *   /:projectName/*     → ProjectLayout (URL ↔ Redux bridge) → Shell → page
- *   /onboarding         → Onboarding (no shell, protected)
- *   /login              → Login
- *   /login/success      → LoginSuccess
  */
 export default function App() {
   const dispatch = useDispatch();
+  const accessToken = getAccessToken();
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
 
   useEffect(() => {
-    // Only run silent refresh if we're not landing on the auth callback,
-    // which handles its own initialization via handleOAuthCallback race-free.
-    if (!window.location.pathname.startsWith("/login/success")) {
-      dispatch(initializeAuth());
-    }
+    const isOAuthCallback =
+      window.location.pathname.startsWith("/login/success");
+    if (isOAuthCallback || isAuthenticated || accessToken) return;
+    dispatch(initializeAuth());
   }, [dispatch]);
 
   return (

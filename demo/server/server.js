@@ -79,7 +79,7 @@ app.post("/config", (req, res) => {
 
   isConfigured = true;
 
-  const cookieOpts = { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: "lax" };
+  const cookieOpts = { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: "none" };
   res.cookie("monito_apiKey", apiKey, cookieOpts);
   res.cookie("monito_apiSecret", apiSecret, cookieOpts);
   res.cookie("monito_url", url, cookieOpts);
