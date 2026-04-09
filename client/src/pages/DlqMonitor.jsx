@@ -31,7 +31,6 @@ import * as dlqApi from "@/api/dlq.api";
 
 /**
  * DLQ monitoring page. Shows failed outbox entries with replay capabilities.
- * Outbox entries fail when they exceed MAX_ATTEMPTS during projection.
  */
 export default function DlqMonitor() {
   const [page, setPage] = useState(1);

@@ -35,7 +35,6 @@ import { cn } from "@/lib/utils";
 
 /**
  * Settings page - profile overview + project management with API keys.
- * Project management was moved here from Integration for better UX.
  */
 export default function Settings() {
   const { user, projects, activeProjectId } = useSelector(
@@ -80,7 +79,6 @@ export default function Settings() {
       await deleteProject(id);
       const updatedProjects = await listProjects();
       dispatch(setProjects(updatedProjects));
-      // If we deleted the currently active project, navigate to another one
       if (id === activeProjectId) {
         const remaining = updatedProjects.filter((p) => p.id !== id);
         if (remaining.length > 0) {
