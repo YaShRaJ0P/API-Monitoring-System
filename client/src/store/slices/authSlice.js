@@ -12,17 +12,13 @@ export const initializeAuth = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             const token = await refreshToken();
-            log.log("[DEBUG] Initialize Auth : ", token);
             if (!token) return rejectWithValue("No token received");
 
             setAccessToken(token);
             const user = await getMe();
-            console.log("[DEBUG] Initialize Auth : ", user);
             const projects = await listProjects();
-            console.log("[DEBUG] Initialize Auth : ", projects);
             return { user, projects };
         } catch (error) {
-            console.error("[DEBUG] initializeAuth failed:", error);
             setAccessToken(null);
             return rejectWithValue("Session expired");
         }
