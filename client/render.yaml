@@ -7,7 +7,7 @@ services:
     routes:
       - type: rewrite
         source: /api/*
-        destination: https://monito-api-hrtu4.ondigitalocean.app/api/v1/*
+        destination: https://api-monitoring-system-server-test.onrender.com/api/v1/*
       - type: rewrite
         source: /*
         destination: /index.html
