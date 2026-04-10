@@ -36,7 +36,7 @@ const sendToRetryQueue = (channel: Channel, content: unknown, retryCount: number
         persistent: true,
     });
 
-    log.info(`Retry scheduled in ${ttl / 1000}s (attempt ${retryCount + 1})`);
+    log.debug(`Retry scheduled in ${ttl / 1000}s (attempt ${retryCount + 1})`);
 };
 
 /**
@@ -146,7 +146,7 @@ export const createTelemetryConsumer = async (processingService: ProcessingServi
             await channel.consume(QUEUES.TELEMETRY, (msg) => {
                 return processMessage(channel, processingService, msg);
             });
-            log.info("Telemetry consumer started");
+            log.debug("Telemetry consumer started");
         } catch (error) {
             log.error("Failed to setup telemetry consumer", undefined, error instanceof Error ? error : undefined);
         }
@@ -158,7 +158,7 @@ export const createTelemetryConsumer = async (processingService: ProcessingServi
 
     // Listen for re-connections to re-subscribe
     RabbitMQ.emitter.on("reconnect", async (newChannel: Channel) => {
-        log.info("RabbitMQ reconnected, re-subscribing telemetry consumer...");
+        log.debug("RabbitMQ reconnected, re-subscribing telemetry consumer...");
         await setupConsumer(newChannel);
     });
 };

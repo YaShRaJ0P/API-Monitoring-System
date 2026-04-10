@@ -56,7 +56,7 @@ export class PostgreSQL {
             await this.pool.query("SELECT 1");
             await this.pool.query(sql);
 
-            log.info("PostgreSQL connected and schema verified");
+            log.debug("PostgreSQL connected and schema verified");
             return this.pool;
         } catch (error) {
             log.error("PostgreSQL connection failed", undefined, error instanceof Error ? error : undefined);
@@ -87,7 +87,7 @@ export class PostgreSQL {
             if (this.pool) {
                 await this.pool.end();
                 this.pool = null;
-                log.info("PostgreSQL disconnected");
+                log.debug("PostgreSQL disconnected");
             }
         } catch (error) {
             log.error("PostgreSQL disconnection failed", undefined, error instanceof Error ? error : undefined);

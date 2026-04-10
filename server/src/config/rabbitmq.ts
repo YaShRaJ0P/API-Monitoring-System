@@ -68,14 +68,14 @@ export class RabbitMQ {
                     }
                 });
 
-                log.info("Connected and topology verified");
+                log.debug("Connected and topology verified");
                 this.emitter.emit("reconnect", this.channel);
                 return this.channel;
             } catch (error) {
                 this.reset();
                 const delay = Math.min(1000 * Math.pow(2, this.retryCount), 30000);
                 this.retryCount += 1;
-                
+
                 if (this.retryCount < 10) {
                     log.error(`Connection failed, retrying in ${delay}ms...`, { attempt: this.retryCount + 1 });
                     await new Promise(resolve => setTimeout(resolve, delay));
@@ -190,7 +190,7 @@ export class RabbitMQ {
         if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
 
         this.reconnectTimeout = setTimeout(() => {
-            log.info("Attempting background reconnection...");
+            log.debug("Attempting background reconnection...");
             if (this.url) {
                 this.connect(this.url).catch(err => {
                     log.error("Background reconnection failed", undefined, err);
@@ -207,7 +207,7 @@ export class RabbitMQ {
      */
     static setSimulationMode(on: boolean): void {
         this.simulationMode = on;
-        log.info(`Simulation mode ${on ? "ENABLED" : "DISABLED"}`);
+        log.debug(`Simulation mode ${on ? "ENABLED" : "DISABLED"}`);
     }
 
     /**
@@ -245,7 +245,7 @@ export class RabbitMQ {
             }
 
             this.reset();
-            log.info("Disconnected gracefully");
+            log.debug("Disconnected gracefully");
         } catch (error) {
             log.error("Disconnection failed", undefined, error instanceof Error ? error : undefined);
         }

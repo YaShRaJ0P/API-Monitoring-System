@@ -31,7 +31,7 @@ export class OutboxProcessor {
     start() {
         if (this.isRunning) return;
         this.isRunning = true;
-        log.info("Starting PostgreSQL OutboxProcessor...");
+        log.debug("Starting PostgreSQL OutboxProcessor...");
         this.scheduleNextQuery();
     }
 
@@ -41,7 +41,7 @@ export class OutboxProcessor {
     async stop() {
         if (!this.isRunning) return;
         this.isRunning = false;
-        log.info("Stopping PostgreSQL OutboxProcessor...");
+        log.debug("Stopping PostgreSQL OutboxProcessor...");
         if (this.timeoutId) {
             clearTimeout(this.timeoutId);
             this.timeoutId = null;
@@ -51,7 +51,7 @@ export class OutboxProcessor {
         while (this.isProcessing) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        log.info("PostgreSQL OutboxProcessor stopped gracefully.");
+        log.debug("PostgreSQL OutboxProcessor stopped gracefully.");
     }
 
     private scheduleNextQuery() {

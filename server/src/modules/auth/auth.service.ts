@@ -21,7 +21,7 @@ export class AuthService {
      * @throws {AppError} 400 if email is not found in the profile
      */
     async handleGoogleLogin(profile: Profile): Promise<ITenant> {
-        log.info(`Processing Google login for user: ${profile.id}`);
+        log.debug(`Processing Google login for user: ${profile.id}`);
         let tenant = await this.authRepo.findByGoogleId(profile.id);
 
         if (!tenant) {
@@ -31,7 +31,7 @@ export class AuthService {
                 throw new AppError(400, "Email not found in Google profile");
             }
 
-            log.info(`Creating new tenant for email: ${email}`);
+            log.debug(`Creating new tenant for email: ${email}`);
             tenant = await this.authRepo.createTenant({
                 google_id: profile.id,
                 email: email,
@@ -49,12 +49,12 @@ export class AuthService {
      */
     async handleDemoLogin(): Promise<{ refreshToken: string; accessToken: string; }> {
         const demoEmail = "demo@monito.api";
-        log.info(`Processing Demo Login for: ${demoEmail}`);
+        log.debug(`Processing Demo Login for: ${demoEmail}`);
 
         let tenant = await this.authRepo.findByEmail(demoEmail);
 
         if (!tenant) {
-            log.info(`Creating NEW Demo Tenant account`);
+            log.debug(`Creating NEW Demo Tenant account`);
             tenant = await this.authRepo.createTenant({
                 email: demoEmail,
                 name: "Demo Account",
@@ -66,7 +66,7 @@ export class AuthService {
         const { refreshToken, accessToken } = generateTokens({ id: tenant.id, email: tenant.email });
 
         await this.authRepo.updateRefreshToken(tenant.id, refreshToken);
-        log.info(`Demo tokens generated for: ${tenant.email}`);
+        log.debug(`Demo tokens generated for: ${tenant.email}`);
 
         return { refreshToken, accessToken };
     }
@@ -100,7 +100,7 @@ export class AuthService {
         const { refreshToken, accessToken } = generateTokens({ id: tenant.id, email: tenant.email });
 
         await this.authRepo.updateRefreshToken(tenant.id, refreshToken);
-        log.info(`Tokens generated for user: ${tenant.email}`);
+        log.debug(`Tokens generated for user: ${tenant.email}`);
         return { refreshToken, accessToken };
     }
 
@@ -110,7 +110,7 @@ export class AuthService {
      * @returns {Promise<void>}
      */
     async logout(userId: string): Promise<void> {
-        log.info(`Logging out user: ${userId}`);
+        log.debug(`Logging out user: ${userId}`);
         await this.authRepo.updateRefreshToken(userId, null);
     }
 
@@ -137,7 +137,7 @@ export class AuthService {
         const { refreshToken, accessToken } = generateTokens({ id: tenant.id, email: tenant.email });
 
         await this.authRepo.updateRefreshToken(tenant.id, refreshToken);
-        log.info(`Tokens refreshed for user: ${tenant.email}`);
+        log.debug(`Tokens refreshed for user: ${tenant.email}`);
         return { refreshToken, accessToken };
     }
 

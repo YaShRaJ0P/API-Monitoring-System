@@ -76,7 +76,7 @@ export const createEmailConsumer = async () => {
                 return processMessage(channel, msg);
             });
 
-            log.info("Email alerts consumer started");
+            log.debug("Email alerts consumer started");
         } catch (error) {
             log.error("Failed to setup Email consumer", undefined, error instanceof Error ? error : undefined);
         }
@@ -88,7 +88,7 @@ export const createEmailConsumer = async () => {
 
     // Listen for re-connections to re-subscribe
     RabbitMQ.emitter.on("reconnect", async (newChannel: Channel) => {
-        log.info("RabbitMQ reconnected, re-subscribing email consumer...");
+        log.debug("RabbitMQ reconnected, re-subscribing email consumer...");
         await setupConsumer(newChannel);
     });
 };

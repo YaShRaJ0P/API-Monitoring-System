@@ -114,7 +114,7 @@ export class AlertsService {
                     if (rule.status === "triggered") {
                         // Metric recovered, resolve the alert
                         await this.alertsRepo.resolveAlert(rule.id);
-                        log.info(`Rule ${rule.id} (${rule.name}) automatically resolved back to normal.`);
+                        log.debug(`Rule ${rule.id} (${rule.name}) automatically resolved back to normal.`);
                     }
                 }
             } catch (error) {

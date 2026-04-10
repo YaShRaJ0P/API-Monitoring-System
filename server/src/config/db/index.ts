@@ -32,7 +32,7 @@ export class DataBaseConfig {
             ]);
 
             this.isInitialized = true;
-            log.info("All databases connected successfully");
+            log.debug("All databases connected successfully");
         } catch (error) {
             log.error("Failed to connect to one or more databases", undefined, error instanceof Error ? error : undefined);
             throw error; // Re-throw to prevent server startup
@@ -69,7 +69,7 @@ export class DataBaseConfig {
             ]);
 
             this.isInitialized = false;
-            log.info("All databases disconnected");
+            log.debug("All databases disconnected");
         } catch (error) {
             log.error("Error during database disconnection", undefined, error instanceof Error ? error : undefined);
         }

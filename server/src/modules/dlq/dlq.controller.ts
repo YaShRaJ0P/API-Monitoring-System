@@ -51,7 +51,7 @@ export class DLQController {
         try {
             const { id } = req.params;
             await this.dlqService.replayEntry(id as string);
-            log.info(`Replayed DLQ entry ${id}`);
+            log.debug(`Replayed DLQ entry ${id}`);
             response(res, 200, "Entry queued for replay", null);
         } catch (error) {
             next(error);
@@ -61,7 +61,7 @@ export class DLQController {
     replayAll = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const rowCount = await this.dlqService.replayAll();
-            log.info(`Replayed ${rowCount} DLQ entries`);
+            log.debug(`Replayed ${rowCount} DLQ entries`);
             res.json({
                 success: true,
                 message: `${rowCount} entries queued for replay`,

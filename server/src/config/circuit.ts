@@ -91,12 +91,12 @@ export class Circuit {
 
         // Wait for any ongoing replay to finish
         while (this.isReplaying) {
-            log.info("Waiting for replay to finish before shutdown...");
+            log.debug("Waiting for replay to finish before shutdown...");
             await new Promise((r) => setTimeout(r, 200));
         }
 
         this.breaker.shutdown();
-        log.info("Circuit breaker shutdown complete");
+        log.debug("Circuit breaker shutdown complete");
     };
 
     /**
@@ -172,7 +172,7 @@ export class Circuit {
             if (deferred.length > 0) {
                 const pipeline = deferred.map(m => JSON.stringify(m));
                 await this.redis.rPush(BUFFER_KEY, pipeline);
-                log.info(`Deferred ${deferred.length} not-yet-ready message(s) back to Redis buffer`);
+                log.debug(`Deferred ${deferred.length} not-yet-ready message(s) back to Redis buffer`);
             }
             this.isReplaying = false;
         }
@@ -182,7 +182,7 @@ export class Circuit {
      * Forces the circuit breaker into the CLOSED state immediately.
      */
     public forceClose(): void {
-        log.info("Circuit breaker force-closed by admin restore");
+        log.debug("Circuit breaker force-closed by admin restore");
         this.breaker.close();
     }
 
@@ -195,13 +195,13 @@ export class Circuit {
         });
 
         this.breaker.on("halfOpen", () => {
-            log.info("Circuit breaker HALF-OPEN - testing recovery with a buffered probe");
+            log.debug("Circuit breaker HALF-OPEN - testing recovery with a buffered probe");
             this.replayRedisBuffer();
         });
 
         this.breaker.on("close", () => {
             this.hasLoggedReject = false;
-            log.info("Circuit breaker CLOSED - RabbitMQ recovered");
+            log.debug("Circuit breaker CLOSED - RabbitMQ recovered");
             this.replayRedisBuffer();
         });
 

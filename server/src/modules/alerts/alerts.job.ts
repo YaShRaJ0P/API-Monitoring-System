@@ -35,7 +35,7 @@ export class AlertWorker {
             return;
         }
 
-        log.info(`AlertWorker started (interval: ${intervalMs}ms)`);
+        log.debug(`AlertWorker started (interval: ${intervalMs}ms)`);
 
         // Run once immediately on startup, then on the interval
         this.tick();
@@ -49,7 +49,7 @@ export class AlertWorker {
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
-            log.info("AlertWorker stopped");
+            log.debug("AlertWorker stopped");
         }
     }
 
