@@ -41,18 +41,7 @@ export const generateTokens = (user: { id: string; email: string }): { accessTok
  * @throws {JsonWebTokenError} If the token is invalid or expired
  */
 export const verifyAccessToken = (token: string): jwt.JwtPayload | string => {
-    try {
-        return jwt.verify(token, config.jwt.access_token_secret!);
-    } catch (error: any) {
-        if (error.name === "TokenExpiredError") {
-            console.warn(`[DEBUG] JWT Access Token Expired at ${error.expiredAt}`);
-        } else if (error.name === "JsonWebTokenError") {
-            console.error(`[DEBUG] JWT Access Token Invalid Signature: ${error.message}`);
-        } else {
-            console.error(`[DEBUG] JWT Access Token Verification Failed: ${error.message}`);
-        }
-        throw error;
-    }
+    return jwt.verify(token, config.jwt.access_token_secret!);
 };
 
 /**

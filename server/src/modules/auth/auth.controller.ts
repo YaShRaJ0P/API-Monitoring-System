@@ -39,7 +39,6 @@ export class AuthController {
             failureRedirect: `${config.client_uri}/login?error=auth_failed`,
             session: true,
         }, async (err: any, user: any) => {
-            log.info("[DEBUG] Callback hit:", req.originalUrl);
             if (err || !user) {
                 log.error("Google authentication failed", undefined, err instanceof Error ? err : undefined);
                 return res.redirect(`${config.client_uri}/login?error=auth_failed`);
@@ -162,10 +161,7 @@ export class AuthController {
 
             const token = req.cookies?.refreshToken as string | undefined;
 
-            log.debug(`[DEBUG] Refresh token request received. Cookies present: ${Object.keys(req.cookies || {}).join(", ")}`);
-
             if (!token) {
-                log.warn("[DEBUG] Refresh token not found in cookies");
                 throw new AppError(401, "Refresh token not found");
             }
 

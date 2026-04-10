@@ -2,9 +2,6 @@ import { AdminRepository } from "./admin.repository.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import { RabbitMQ } from "../../config/rabbitmq.js";
 import { CircuitRegistry } from "../../config/circuit.js";
-import { createLogger } from "../../shared/utils/logger.js";
-
-const log = createLogger("AdminService");
 
 
 export class AdminService {
