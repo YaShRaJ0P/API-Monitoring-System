@@ -36,17 +36,32 @@ export async function apiKeyMiddleware(req: Request, res: Response, next: NextFu
             throw new AppError(401, "Request expired or timestamp invalid");
         }
 
-        const pool = DataBaseConfig.getPostgresPool();
-        const result = await pool.query(
-            "SELECT id, api_secret, tenant_id FROM projects WHERE api_key = $1",
-            [apiKey]
-        );
+        const redisClient = DataBaseConfig.getRedisClient();
+        const cacheKey = `apikey:meta:${apiKey}`;
 
-        if (result.rows.length === 0) {
-            throw new AppError(401, "Invalid API key");
+        // 1. Try to get metadata from Redis Cache
+        const cached = await redisClient.get(cacheKey);
+        let project: { id: string; api_secret: string; tenant_id: string };
+
+        if (cached) {
+            project = JSON.parse(cached);
+        } else {
+            // 2. Cache Miss - Query Postgres
+            const pool = DataBaseConfig.getPostgresPool();
+            const result = await pool.query(
+                "SELECT id, api_secret, tenant_id FROM projects WHERE api_key = $1",
+                [apiKey]
+            );
+
+            if (result.rows.length === 0) {
+                throw new AppError(401, "Invalid API key");
+            }
+
+            project = result.rows[0];
+
+            // 3. Store in Redis with a 10-minute TTL (600 seconds)
+            await redisClient.setEx(cacheKey, 600, JSON.stringify(project));
         }
-
-        const project = result.rows[0];
 
         // Compute HMAC signature
         const bodyContent = Object.keys(req.body || {}).length > 0 ? JSON.stringify(req.body) : "";

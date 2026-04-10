@@ -54,7 +54,7 @@ export class AuthController {
                     maxAge: 1000 * 60 * 60 * 24 * 7,
                 });
 
-                log.info(`Authentication successful for user: ${user.id}`);
+                log.debug(`Authentication successful for user: ${user.id}`);
                 res.redirect(`${config.client_uri}/login/success?accessToken=${accessToken}`);
             } catch (error) {
                 next(error);
@@ -80,7 +80,7 @@ export class AuthController {
                 maxAge: 1000 * 60 * 60 * 24 * 7,
             });
 
-            log.info(`Demo login successful - Redirecting to app dashboard`);
+            log.debug(`Demo login successful - Redirecting to app dashboard`);
             res.redirect(`${config.client_uri}/login/success?accessToken=${accessToken}`);
         } catch (error) {
             log.error("Demo login failed internally", undefined, error instanceof Error ? error : undefined);
@@ -119,13 +119,13 @@ export class AuthController {
                         if (logoutErr) {
                             return next(logoutErr);
                         }
-                        log.info(`User logged out: ${userId}`);
+                        log.debug(`User logged out: ${userId}`);
                         response(res, 200, "Logged out successfully", null);
                     });
                 });
             } else {
                 // No session (stateless JWT-only flow)
-                log.info(`User logged out (no session): ${userId}`);
+                log.debug(`User logged out (no session): ${userId}`);
                 response(res, 200, "Logged out successfully", null);
             }
         } catch (error) {

@@ -50,10 +50,10 @@ export class MongoProjector {
                 error: data.error,
             });
             await rawEvent.save();
-            log.info(`Raw event projected to MongoDB: ${data.event_id}`);
+            log.debug(`Raw event projected to MongoDB: ${data.event_id}`);
         } catch (error) {
             if (isDuplicateKeyError(error)) {
-                log.info(`Duplicate event skipped (already projected): ${data.event_id}`);
+                log.debug(`Duplicate event skipped (already projected): ${data.event_id}`);
                 return; // Idempotent - successfully completed in context of outbox
             }
             throw error;

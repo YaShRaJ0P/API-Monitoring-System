@@ -46,7 +46,7 @@ export class MongoDB {
                 mongoose.connection.on("error", () => MongoDB.handleDisconnect());
                 mongoose.connection.on("close", () => MongoDB.handleDisconnect());
 
-                log.info("MongoDB connected");
+                log.debug("MongoDB connected");
 
                 return mongooseInstance;
             } catch (error) {
@@ -91,7 +91,7 @@ export class MongoDB {
         try {
             if (this.instance) {
                 await this.instance.disconnect();
-                log.info("MongoDB disconnected");
+                log.debug("MongoDB disconnected");
             }
 
             this.reset();

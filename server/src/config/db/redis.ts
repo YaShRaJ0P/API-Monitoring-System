@@ -40,7 +40,7 @@ export class Redis {
             });
 
             await this.client.connect();
-            log.info("Redis connected");
+            log.debug("Redis connected");
             return this.client;
         } catch (error) {
             log.error("Redis connection failed", undefined, error instanceof Error ? error : undefined);
@@ -78,7 +78,7 @@ export class Redis {
             if (this.client && this.client.isOpen) {
                 await this.client.quit();
                 this.client = null;
-                log.info("Redis disconnected");
+                log.debug("Redis disconnected");
             }
         } catch (error) {
             log.error("Redis disconnection failed", undefined, error instanceof Error ? error : undefined);

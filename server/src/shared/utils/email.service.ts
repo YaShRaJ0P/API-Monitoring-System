@@ -8,78 +8,78 @@ const log = createLogger("EmailService");
  * Service for sending emails via Nodemailer.
  */
 class EmailService {
-    private transporter: nodemailer.Transporter | null = null;
+  private transporter: nodemailer.Transporter | null = null;
 
-    constructor() {
-        if (config.email.host && config.email.user) {
-            this.transporter = nodemailer.createTransport({
-                host: config.email.host,
-                port: config.email.port,
-                secure: config.email.secure,
-                auth: {
-                    user: config.email.user,
-                    pass: config.email.pass,
-                },
-            });
-            log.info(`EmailService configured with host: ${config.email.host}`);
-        } else {
-            log.warn("EmailService not configured properly (missing SMTP host or user in env)");
-        }
+  constructor() {
+    if (config.email.host && config.email.user) {
+      this.transporter = nodemailer.createTransport({
+        host: config.email.host,
+        port: config.email.port,
+        secure: config.email.secure,
+        auth: {
+          user: config.email.user,
+          pass: config.email.pass,
+        },
+      });
+      log.debug(`EmailService configured with host: ${config.email.host}`);
+    } else {
+      log.warn("EmailService not configured properly (missing SMTP host or user in env)");
+    }
+  }
+
+  /**
+   * Sends a generic email.
+   * @param {string} to - Recipient email address
+   * @param {string} subject - Email subject
+   * @param {string} html - Email body in HTML format
+   */
+  async sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+    if (!this.transporter) {
+      log.error("Cannot send email: Transporter not initialised");
+      return false;
     }
 
-    /**
-     * Sends a generic email.
-     * @param {string} to - Recipient email address
-     * @param {string} subject - Email subject
-     * @param {string} html - Email body in HTML format
-     */
-    async sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-        if (!this.transporter) {
-            log.error("Cannot send email: Transporter not initialised");
-            return false;
-        }
+    try {
+      // verify connection
+      await this.transporter.verify();
 
-        try {
-            // verify connection
-            await this.transporter.verify();
+      await this.transporter.sendMail({
+        from: `"${config.email.fromName}" <${config.email.fromAddress}>`,
+        to,
+        subject,
+        html,
+      });
+      log.debug(`Email sent successfully to: ${to}`);
+      return true;
+    } catch (error: any) {
+      switch (error.code) {
+        case "ECONNECTION":
+        case "ETIMEDOUT":
+          log.error("Network error - retry later:", error.message);
+          break;
+        case "EAUTH":
+          log.error("Authentication failed:", error.message);
+          break;
+        case "EENVELOPE":
+          log.error("Invalid recipients:", error.rejected);
+          break;
+        default:
+          log.error("Failed to send email", undefined, error ? error : undefined);
+      }
 
-            await this.transporter.sendMail({
-                from: `"${config.email.fromName}" <${config.email.fromAddress}>`,
-                to,
-                subject,
-                html,
-            });
-            log.info(`Email sent successfully to: ${to}`);
-            return true;
-        } catch (error: any) {
-            switch (error.code) {
-                case "ECONNECTION":
-                case "ETIMEDOUT":
-                    log.error("Network error - retry later:", error.message);
-                    break;
-                case "EAUTH":
-                    log.error("Authentication failed:", error.message);
-                    break;
-                case "EENVELOPE":
-                    log.error("Invalid recipients:", error.rejected);
-                    break;
-                default:
-                    log.error("Failed to send email", undefined, error ? error : undefined);
-            }
-
-            return false;
-        }
+      return false;
     }
+  }
 
-    /**
-     * Sends an alert notification email.
-     * @param {string} to - Recipient email
-     * @param {Object} data - Alert details
-     */
-    async sendAlert(to: string, data: { ruleName: string; metric: string; value: number; threshold: number }) {
-        const subject = `🚨 Alert Triggered: ${data.ruleName}`;
-        
-        const html = `
+  /**
+   * Sends an alert notification email.
+   * @param {string} to - Recipient email
+   * @param {Object} data - Alert details
+   */
+  async sendAlert(to: string, data: { ruleName: string; metric: string; value: number; threshold: number }) {
+    const subject = `🚨 Alert Triggered: ${data.ruleName}`;
+
+    const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -160,8 +160,8 @@ class EmailService {
 </body>
 </html>
         `;
-        return this.sendEmail(to, subject, html);
-    }
+    return this.sendEmail(to, subject, html);
+  }
 }
 
 export const emailService = new EmailService();

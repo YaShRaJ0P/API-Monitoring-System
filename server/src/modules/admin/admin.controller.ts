@@ -39,7 +39,7 @@ export class AdminController {
 
             await this.adminService.deleteUser(id as string, callerId);
 
-            log.info(`Admin ${callerId} deleted user ${id}`);
+            log.debug(`Admin ${callerId} deleted user ${id}`);
             response(res, 200, "User deleted successfully", null);
         } catch (error) {
             next(error);
@@ -60,7 +60,7 @@ export class AdminController {
 
             const updated = await this.adminService.toggleAdmin(id as string, userId);
 
-            log.info(`Admin ${userId} toggled admin for user ${id} → ${updated.is_admin}`);
+            log.debug(`Admin ${userId} toggled admin for user ${id} → ${updated.is_admin}`);
             response(res, 200, `User is now ${updated.is_admin ? "an admin" : "a regular user"}`, updated);
         } catch (error) {
             next(error);

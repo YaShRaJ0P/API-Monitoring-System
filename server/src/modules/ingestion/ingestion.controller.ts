@@ -43,7 +43,7 @@ export class IngestionController {
                 timestamp: eventTimestamp,
             };
 
-            log.info(`Ingesting event for tenant=${tenantId} project=${projectId}`);
+            log.debug(`Ingesting event for tenant=${tenantId} project=${projectId}`);
 
             const validationResult = validateIngestion(data);
 

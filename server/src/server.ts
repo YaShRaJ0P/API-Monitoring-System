@@ -9,7 +9,7 @@ const log = createLogger("Server");
 
 const startServer = async (): Promise<void> => {
     try {
-        log.info("Starting API Monitoring System...");
+        log.debug("Starting API Monitoring System...");
 
         // 1. Connect all databases first
         await DataBaseConfig.connectDB();
@@ -25,7 +25,7 @@ const startServer = async (): Promise<void> => {
 
         // 5. Start Express server
         app.listen(config.port, () => {
-            log.info(`Server is running on port ${config.port}`, { env: config.NODE_ENV });
+            log.debug(`Server is running on port ${config.port}`, { env: config.NODE_ENV });
         });
 
         // ------ Graceful Shutdown ------
