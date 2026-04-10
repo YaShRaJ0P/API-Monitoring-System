@@ -26,6 +26,9 @@ export const config = {
         },
         postgres: {
             uri: process.env.POSTGRES_URI,
+            poolSize: parseInt(process.env.POSTGRES_POOL_SIZE || "10", 10),
+            idleTimeoutMillis: parseInt(process.env.POSTGRES_IDLE_TIMEOUT_MS || "30000", 10),
+            connectionTimeoutMillis: parseInt(process.env.POSTGRES_CONNECTION_TIMEOUT_MS || "5000", 10),
         },
         redis: {
             uri: process.env.REDIS_URI,

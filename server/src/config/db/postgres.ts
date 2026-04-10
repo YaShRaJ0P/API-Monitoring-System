@@ -48,9 +48,9 @@ export class PostgreSQL {
             this.pool = new Pool({
                 connectionString: uri,
                 ssl: config.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-                max: 10,
-                idleTimeoutMillis: 30000,
-                connectionTimeoutMillis: 5000,
+                max: config.db.postgres.poolSize,
+                idleTimeoutMillis: config.db.postgres.idleTimeoutMillis,
+                connectionTimeoutMillis: config.db.postgres.connectionTimeoutMillis,
             });
 
             await this.pool.query("SELECT 1");
