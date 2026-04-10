@@ -36,15 +36,15 @@ export async function apiKeyMiddleware(req: Request, res: Response, next: NextFu
             throw new AppError(401, "Request expired or timestamp invalid");
         }
 
-        const pool = DataBaseConfig.getPostgresPool();
-        const result = await pool.query(
-            "SELECT id, api_secret, tenant_id FROM projects WHERE api_key = $1",
-            [apiKey]
-        );
+            const pool = DataBaseConfig.getPostgresPool();
+            const result = await pool.query(
+                "SELECT id, api_secret, tenant_id FROM projects WHERE api_key = $1",
+                [apiKey]
+            );
 
-        if (result.rows.length === 0) {
-            throw new AppError(401, "Invalid API key");
-        }
+            if (result.rows.length === 0) {
+                throw new AppError(401, "Invalid API key");
+            }
 
         const project = result.rows[0];
 
