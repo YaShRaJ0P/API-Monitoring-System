@@ -3,11 +3,12 @@ import { DataBaseConfig } from "../../config/db/index.js";
 import type { AuthRequest } from "../types/auth.types.js";
 import { AppError } from "../errors/AppError.js";
 import { createLogger } from "../utils/logger.js";
+import { config } from "../../config/config.js";
 
 const log = createLogger("ApiKeyRateLimiter");
 
-const CAPACITY = 500; // max burst
-const REFILL_RATE = 50;  // tokens / second  (3000 / min sustained)
+const CAPACITY = config.api.rateLimit.capacity;
+const REFILL_RATE = config.api.rateLimit.refillRate;
 const REQUEST_COST = 1;
 
 

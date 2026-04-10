@@ -56,7 +56,11 @@ export const config = {
 
     api: {
         prefix: "/api",
-        version: "v1"
+        version: "v1",
+        rateLimit: {
+            capacity: parseInt(process.env.RATE_LIMIT_CAPACITY || "500", 10),
+            refillRate: parseInt(process.env.RATE_LIMIT_REFILL_RATE || "50", 10),
+        }
     },
 
     email: {
