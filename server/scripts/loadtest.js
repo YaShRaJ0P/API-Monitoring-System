@@ -6,37 +6,26 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../.env') });
-
 /**
- * Configuration for the load test.
- * Set these in your server/.env file for testing.
+ * CONFIGURATION: Paste your API Keys and Secrets here.
  */
-const TARGET_URL = process.env.TEST_TARGET_URL || 'http://localhost:3000/api/v1/ingest';
+const CREDENTIALS = [
+    { key: 'cb1cd47c-645d-448f-8ae4-a455ff928ec1', secret: '3b6962992f8692473202107a220dc2b43feb4de2c2dd40adfd60de5ecad74f7b' },
+    { key: '1d770efa-f733-4ed4-a19f-fa01b905a7bc', secret: 'cbef831bebb3ca5f3864ddda93c40cfc85325ad7ca3555aba6b8003d9154aa1c' },
+    { key: 'e1e61179-cf08-4266-a696-b1c1feaf55ba', secret: '8b85745c798e6fd32e95ae996925b8fb82ac046b90297e73c09e395fdf8d2557' },
+    { key: '0020490a-cf6e-46f1-ac7a-58d341e73f59', secret: '7a9a9b1cf60d8e965e852fdffcf30d1ad7677fb74b2197e7f90505b41e8ea574' },
+    { key: '00547a81-aa00-4e98-8145-e81bfaee645a', secret: '271e1ac88c1bfeb7f5d6d6808abfb58c509319c8ba39554085a5be81252d2a1f' }
+
+];
+
+const TARGET_URL = 'https://monito-api-hrtu4.ondigitalocean.app/api/v1/ingest'; // Change this to your DigitalOcean URL
 
 /**
- * Discover all TEST_API_KEY_N and TEST_API_SECRET_N pairs.
+ * Discover credentials from the array.
  */
 function getCredentials() {
-    const credentials = [];
-    let i = 1;
-    
-    // Support both the original single-key format and the new numbered format
-    if (process.env.TEST_API_KEY && process.env.TEST_API_SECRET) {
-        credentials.push({ 
-            key: process.env.TEST_API_KEY, 
-            secret: process.env.TEST_API_SECRET 
-        });
-    }
-
-    while (process.env[`TEST_API_KEY_${i}`] && process.env[`TEST_API_SECRET_${i}`]) {
-        credentials.push({
-            key: process.env[`TEST_API_KEY_${i}`],
-            secret: process.env[`TEST_API_SECRET_${i}`]
-        });
-        i++;
-    }
-
-    return credentials;
+    // Filter out placeholder values
+    return CREDENTIALS.filter(c => !c.key.includes('PASTE_YOUR_KEY'));
 }
 
 const credentialsList = getCredentials();
@@ -92,6 +81,7 @@ function runTest() {
         connections: CONNECTIONS,
         pipelining: 1,
         duration: DURATION,
+        method: 'POST',
         headers: {
             'content-type': 'application/json'
         },
@@ -130,7 +120,7 @@ function runTest() {
             console.log(`Latency (ms):   Avg: ${result.latency.average}, Max: ${result.latency.max}, P99: ${result.latency.p99}`);
             console.log(`Errors (Non-2xx): ${result.non2xx}`);
             console.log('-------------------\n');
-            
+
             if (result.non2xx > 0) {
                 console.warn('⚠️ Note: Non-2xx responses (like 429 or 503) are common when testing the limits of your circuit breaker and rate limiter.');
             }
