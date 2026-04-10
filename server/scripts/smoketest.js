@@ -1,11 +1,11 @@
 import crypto from 'crypto';
-import axios from 'axios';
+// import axios from 'axios';
 
 /**
  * CONFIGURATION: Use the same credentials as your loadtest.js
  */
 const CREDENTIALS = [
-    { key: 'PASTE_YOUR_KEY_1_HERE', secret: 'PASTE_YOUR_SECRET_1_HERE' },
+    { key: 'cb1cd47c-645d-448f-8ae4-a455ff928ec1', secret: '3b6962992f8692473202107a220dc2b43feb4de2c2dd40adfd60de5ecad74f7b' },
     // { key: 'PASTE_YOUR_KEY_2_HERE', secret: 'PASTE_YOUR_SECRET_2_HERE' },
 ];
 
@@ -30,7 +30,7 @@ async function runSmokeTest() {
             method: 'POST',
             status: 200,
             latency: 10,
-            environment: 'testing',
+            environment: 'development',
             timestamp: new Date().toISOString()
         });
 
@@ -41,13 +41,15 @@ async function runSmokeTest() {
             .digest('hex');
 
         try {
-            const response = await axios.post(TARGET_URL, payload, {
+            const response = await fetch(TARGET_URL, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'x-api-key': user.key,
                     'x-timestamp': timestamp,
                     'x-signature': signature
-                }
+                },
+                body: payload
             });
 
             console.log(`✅ Success: ${response.status} ${response.statusText}`);

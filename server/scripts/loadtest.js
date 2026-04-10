@@ -69,7 +69,7 @@ function signRequest(payload, timestamp, secret) {
  * Starts the autocannon benchmark.
  */
 function runTest() {
-    const CONNECTIONS = 12; // Adjusted to be a multiple of typical user counts (4, 6, etc)
+    const CONNECTIONS = 50;
     const DURATION = 30;
 
     console.log(`🚀 Starting Multi-User Load Test on ${TARGET_URL}...`);
@@ -79,35 +79,33 @@ function runTest() {
     const instance = autocannon({
         url: TARGET_URL,
         connections: CONNECTIONS,
-        pipelining: 1,
+        pipelining: 2,
         duration: DURATION,
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json'
-        },
-        setupClient: (client) => {
-            // Assign a "user" to this client connection based on its local ID
-            // Autocannon doesn't directly expose a connection index here, 
-            // so we'll pick one and stick with it for this connection.
-            const userIndex = Math.floor(Math.random() * credentialsList.length);
-            const user = credentialsList[userIndex];
+        requests: [
+            {
+                method: 'POST',
+                path: '/api/v1/ingest', // Full path is more reliable here
+                setupRequest: (request, client) => {
+                    // Pick a sticky user for this client if not already assigned
+                    if (!client.user) {
+                        const userIndex = Math.floor(Math.random() * credentialsList.length);
+                        client.user = credentialsList[userIndex];
+                    }
 
-            client.setBody = () => {
-                const payload = generatePayload();
-                const timestamp = Date.now().toString();
-                const signature = signRequest(payload, timestamp, user.secret);
+                    const payload = generatePayload();
+                    const timestamp = Date.now().toString();
+                    const signature = signRequest(payload, timestamp, client.user.secret);
 
-                // Update headers dynamically per-request using this connection's user
-                client.setHeaders({
-                    ...client.headers,
-                    'x-api-key': user.key,
-                    'x-timestamp': timestamp,
-                    'x-signature': signature
-                });
+                    request.body = payload;
+                    request.headers['content-type'] = 'application/json';
+                    request.headers['x-api-key'] = client.user.key;
+                    request.headers['x-timestamp'] = timestamp;
+                    request.headers['x-signature'] = signature;
 
-                return payload;
-            };
-        }
+                    return request;
+                }
+            }
+        ]
     }, (err, result) => {
         if (err) {
             console.error('Load test failed:', err);
