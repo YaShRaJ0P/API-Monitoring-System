@@ -69,7 +69,7 @@ function signRequest(payload, timestamp, secret) {
  * Starts the autocannon benchmark.
  */
 function runTest() {
-    const CONNECTIONS = 50;
+    const CONNECTIONS = 5;
     const DURATION = 30;
 
     console.log(`🚀 Starting Multi-User Load Test on ${TARGET_URL}...`);

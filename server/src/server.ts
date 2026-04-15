@@ -43,6 +43,7 @@ const startServer = async (): Promise<void> => {
     } catch (error) {
         log.error("Fatal startup error", undefined, error instanceof Error ? error : undefined);
         try {
+            await stopOutboxProcessor();
             await RabbitMQ.disconnect();
             await DataBaseConfig.disconnect();
         } catch { /* ignore cleanup errors */ }
