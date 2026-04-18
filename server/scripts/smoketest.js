@@ -5,11 +5,12 @@ import crypto from 'crypto';
  * CONFIGURATION: Use the same credentials as your loadtest.js
  */
 const CREDENTIALS = [
-    { key: 'cb1cd47c-645d-448f-8ae4-a455ff928ec1', secret: '3b6962992f8692473202107a220dc2b43feb4de2c2dd40adfd60de5ecad74f7b' },
+    { key: '31c0cfc7-0f9f-4bec-9ee3-d9aeda86426e', secret: '8a7e789af4434d8329f4b59af8d6b21bca53b2b267a0d666d5882c8625cdfa15' },
     // { key: 'PASTE_YOUR_KEY_2_HERE', secret: 'PASTE_YOUR_SECRET_2_HERE' },
 ];
 
-const TARGET_URL = 'https://monito-api-hrtu4.ondigitalocean.app/api/v1/ingest';
+// const TARGET_URL = 'https://monito-api-hrtu4.ondigitalocean.app/api/v1/ingest';
+const TARGET_URL = 'http://localhost:3000/api/v1/ingest';
 
 async function runSmokeTest() {
     console.log(`🔍 Running Smoke Test on ${TARGET_URL}...\n`);

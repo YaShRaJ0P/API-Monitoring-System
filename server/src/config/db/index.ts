@@ -1,6 +1,6 @@
 import { MongoDB } from "./mongo.js";
 import { PostgreSQL } from "./postgres.js";
-import { Redis } from "./redis.js";
+import { RedisDB } from "./redis.js";
 import { createLogger } from "../../shared/utils/logger.js";
 
 const log = createLogger("DatabaseManager");
@@ -28,7 +28,7 @@ export class DataBaseConfig {
             await Promise.all([
                 MongoDB.connect(),
                 PostgreSQL.connect(),
-                Redis.connect()
+                RedisDB.connect()
             ]);
 
             this.isInitialized = true;
@@ -52,7 +52,7 @@ export class DataBaseConfig {
      * @returns {RedisClientType} Redis client
      */
     static getRedisClient() {
-        return Redis.getClient();
+        return RedisDB.getClient();
     }
 
     /**
@@ -65,7 +65,7 @@ export class DataBaseConfig {
             await Promise.allSettled([
                 MongoDB.disconnect(),
                 PostgreSQL.disconnect(),
-                Redis.disconnect()
+                RedisDB.disconnect()
             ]);
 
             this.isInitialized = false;
@@ -80,8 +80,8 @@ export class DataBaseConfig {
      */
     static get MongoDB() { return MongoDB; }
     static get PostgreSQL() { return PostgreSQL; }
-    static get Redis() { return Redis; }
+    static get RedisDB() { return RedisDB; }
 }
 
 // Export individual classes as well
-export { MongoDB, PostgreSQL, Redis };
+export { MongoDB, PostgreSQL, RedisDB };

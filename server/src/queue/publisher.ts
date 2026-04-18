@@ -20,7 +20,6 @@ export const rawPublish = async (message: unknown) => {
             Buffer.from(JSON.stringify(message)),
             { persistent: true, headers: { "x-retry": 0 } }
         );
-
         return response;
     } catch (error) {
         log.error("Raw publish failed", undefined, error instanceof Error ? error : undefined);

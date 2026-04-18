@@ -70,61 +70,77 @@ export class OutboxProcessor {
         this.isProcessing = true;
 
         try {
-            // 1. Fetch pending entries, order by creation, limit to batchSize
             const { rows: entries } = await this.pool.query(
                 `SELECT event_id, payload, attempts
-                 FROM outbox_entries
-                 WHERE status = 'pending'
-                 ORDER BY created_at ASC
-                 LIMIT $1`,
+             FROM outbox_entries
+             WHERE status = 'pending'
+             ORDER BY created_at ASC
+             LIMIT $1`,
                 [this.batchSize]
             );
 
-            if (entries.length === 0) {
-                return; // Nothing to process
+            if (entries.length === 0) return;
+
+            const succeeded: string[] = [];
+            const failed: { id: string; error: string; attempts: number; status: string }[] = [];
+
+            // Concurrent MongoDB projections
+            const CONCURRENCY = 10;
+            for (let i = 0; i < entries.length; i += CONCURRENCY) {
+                const chunk = entries.slice(i, i + CONCURRENCY);
+                await Promise.all(chunk.map(async entry => {
+                    try {
+                        await this.mongoProjector.project(entry.payload as IngestionType);
+                        succeeded.push(entry.event_id);
+                    } catch (error) {
+                        const newAttempts = entry.attempts + 1;
+                        failed.push({
+                            id: entry.event_id,
+                            error: error instanceof Error ? error.message : String(error),
+                            attempts: newAttempts,
+                            status: newAttempts >= this.maxRetries ? "failed" : "pending",
+                        });
+                    }
+                }));
             }
-            // 2. Process each entry
-            for (const entry of entries) {
-                await this.processEntry(entry);
+
+            // Single query for all successes
+            if (succeeded.length > 0) {
+                await this.pool.query(
+                    `UPDATE outbox_entries
+                 SET status = 'processed', processed_at = NOW(), attempts = attempts + 1
+                 WHERE event_id = ANY($1)`,
+                    [succeeded]
+                );
             }
+
+            // Single query for all failures
+            if (failed.length > 0) {
+                await this.pool.query(
+                    `UPDATE outbox_entries AS o
+                 SET status = v.status,
+                     last_error = v.error,
+                     attempts = v.attempts::int
+                 FROM (
+                     SELECT 
+                         UNNEST($1::uuid[]) AS event_id,
+                         UNNEST($2::text[]) AS status,
+                         UNNEST($3::text[]) AS error,
+                         UNNEST($4::int[])  AS attempts
+                 ) AS v
+                 WHERE o.event_id = v.event_id`,
+                    [
+                        failed.map(f => f.id),
+                        failed.map(f => f.status),
+                        failed.map(f => f.error),
+                        failed.map(f => f.attempts),
+                    ]
+                );
+            }
+
         } finally {
             this.isProcessing = false;
         }
     }
 
-    private async processEntry(entry: any): Promise<void> {
-        const { event_id, payload, attempts } = entry;
-        const newAttempts = attempts + 1;
-
-        try {
-            const ingestionData = payload as IngestionType;
-            await this.mongoProjector.project(ingestionData);
-
-            // Mark as processed in PostgreSQL
-            await this.pool.query(
-                `UPDATE outbox_entries
-                 SET status = 'processed', processed_at = NOW(), attempts = $1
-                 WHERE event_id = $2`,
-                [newAttempts, event_id]
-            );
-
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            log.error(`Failed to process outbox entry: ${event_id}`, undefined, error instanceof Error ? error : undefined);
-
-            const newStatus = newAttempts >= this.maxRetries ? 'failed' : 'pending';
-
-            // Mark as failed or increment attempts in PostgreSQL
-            await this.pool.query(
-                `UPDATE outbox_entries
-                 SET status = $1, last_error = $2, attempts = $3
-                 WHERE event_id = $4`,
-                [newStatus, errorMessage, newAttempts, event_id]
-            );
-
-            if (newStatus === 'failed') {
-                log.error(`Outbox entry ${event_id} marked as failed after ${newAttempts} attempts.`);
-            }
-        }
-    }
 }

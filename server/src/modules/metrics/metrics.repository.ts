@@ -255,7 +255,7 @@ export class MetricsRepository {
         const query = `
             SELECT
                 service,
-                SUM(total_requests)::int                               AS total_requests,
+                SUM(total_requests)::int                          AS total_requests,
                 COALESCE(
                     ROUND(SUM(total_latency) / NULLIF(SUM(total_requests), 0)),
                     0

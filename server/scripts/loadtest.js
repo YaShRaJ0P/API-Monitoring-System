@@ -10,15 +10,13 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
  * CONFIGURATION: Paste your API Keys and Secrets here.
  */
 const CREDENTIALS = [
-    { key: 'cb1cd47c-645d-448f-8ae4-a455ff928ec1', secret: '3b6962992f8692473202107a220dc2b43feb4de2c2dd40adfd60de5ecad74f7b' },
-    { key: '1d770efa-f733-4ed4-a19f-fa01b905a7bc', secret: 'cbef831bebb3ca5f3864ddda93c40cfc85325ad7ca3555aba6b8003d9154aa1c' },
-    { key: 'e1e61179-cf08-4266-a696-b1c1feaf55ba', secret: '8b85745c798e6fd32e95ae996925b8fb82ac046b90297e73c09e395fdf8d2557' },
-    { key: '0020490a-cf6e-46f1-ac7a-58d341e73f59', secret: '7a9a9b1cf60d8e965e852fdffcf30d1ad7677fb74b2197e7f90505b41e8ea574' },
-    { key: '00547a81-aa00-4e98-8145-e81bfaee645a', secret: '271e1ac88c1bfeb7f5d6d6808abfb58c509319c8ba39554085a5be81252d2a1f' }
-
+    { key: 'dd522a26-3db0-4021-9058-2d98e9bfff0b', secret: '52c303361ec61d3fb8e4cd6beb3196cdaccce73f75af85b7d5596486c6b54e7f' },
+    { key: '31c0cfc7-0f9f-4bec-9ee3-d9aeda86426e', secret: '8a7e789af4434d8329f4b59af8d6b21bca53b2b267a0d666d5882c8625cdfa15' },
+    { key: '52b1c1c9-0deb-4219-bb16-427a27419c90', secret: 'ef5f8e8bce57469b264a50d3e895f8a380f2825ef165879c5ac7cd41ffb21dd7' },
 ];
 
-const TARGET_URL = 'https://monito-api-hrtu4.ondigitalocean.app/api/v1/ingest'; // Change this to your DigitalOcean URL
+// const TARGET_URL = 'https://monito-api-hrtu4.ondigitalocean.app/api/v1/ingest'; // Cahange this to your DigitalOcean URL
+const TARGET_URL = 'http://localhost:3000/api/v1/ingest';
 
 /**
  * Discover credentials from the array.
@@ -69,38 +67,51 @@ function signRequest(payload, timestamp, secret) {
  * Starts the autocannon benchmark.
  */
 function runTest() {
-    const CONNECTIONS = 5;
-    const DURATION = 30;
+    // Allow CLI overrides: node loadTest.js 50 120 5
+    const CONNECTIONS = parseInt(process.argv[2]) || 50;
+    const DURATION = parseInt(process.argv[3]) || 120;
+    const PIPELINING = parseInt(process.argv[4]) || 5;
 
-    console.log(`🚀 Starting Multi-User Load Test on ${TARGET_URL}...`);
-    console.log(`Discovered ${credentialsList.length} user(s)/project(s).`);
-    console.log(`Simulating ${CONNECTIONS} concurrent connections across all users.`);
+    console.log(`🚀 Load Test Config:`);
+    console.log(`URL: ${TARGET_URL}`);
+    console.log(`Connections: ${CONNECTIONS}`);
+    console.log(`Duration: ${DURATION}s`);
+    console.log(`Pipelining: ${PIPELINING}`);
+    console.log(`Users: ${credentialsList.length}`);
+    console.log('----------------------------------');
 
     const instance = autocannon({
         url: TARGET_URL,
         connections: CONNECTIONS,
-        pipelining: 2,
         duration: DURATION,
+        pipelining: PIPELINING,
+
         requests: [
             {
                 method: 'POST',
-                path: '/api/v1/ingest', // Full path is more reliable here
+                path: '/api/v1/ingest',
                 setupRequest: (request, client) => {
-                    // Pick a sticky user for this client if not already assigned
                     if (!client.user) {
-                        const userIndex = Math.floor(Math.random() * credentialsList.length);
-                        client.user = credentialsList[userIndex];
+                        client.user = credentialsList[
+                            Math.floor(Math.random() * credentialsList.length)
+                        ];
                     }
 
                     const payload = generatePayload();
                     const timestamp = Date.now().toString();
-                    const signature = signRequest(payload, timestamp, client.user.secret);
+                    const signature = signRequest(
+                        payload,
+                        timestamp,
+                        client.user.secret
+                    );
 
                     request.body = payload;
-                    request.headers['content-type'] = 'application/json';
-                    request.headers['x-api-key'] = client.user.key;
-                    request.headers['x-timestamp'] = timestamp;
-                    request.headers['x-signature'] = signature;
+                    request.headers = {
+                        'content-type': 'application/json',
+                        'x-api-key': client.user.key,
+                        'x-timestamp': timestamp,
+                        'x-signature': signature
+                    };
 
                     return request;
                 }
@@ -108,29 +119,23 @@ function runTest() {
         ]
     }, (err, result) => {
         if (err) {
-            console.error('Load test failed:', err);
-        } else {
-            console.log('\n📊 Multi-User Load Test Results:');
-            console.log('-------------------');
-            console.log(`Total Requests: ${result.requests.total}`);
-            console.log(`Total Duration: ${result.duration}s`);
-            console.log(`Requests/sec:   ${result.requests.average}`);
-            console.log(`Latency (ms):   Avg: ${result.latency.average}, Max: ${result.latency.max}, P99: ${result.latency.p99}`);
-            console.log(`Errors (Non-2xx): ${result.non2xx}`);
-            console.log('-------------------\n');
-
-            if (result.non2xx > 0) {
-                console.warn('⚠️ Note: Non-2xx responses (like 429 or 503) are common when testing the limits of your circuit breaker and rate limiter.');
-            }
+            console.error('❌ Load test failed:', err);
+            return;
         }
+
+        console.log('\n📊 Results:');
+        console.log('----------------------------------');
+        console.log(`Req Total:      ${result.requests.total}`);
+        console.log(`Req/sec:        ${result.requests.average}`);
+        console.log(`Latency Avg:    ${result.latency.average} ms`);
+        console.log(`Latency P99:    ${result.latency.p99} ms`);
+        console.log(`Max Latency:    ${result.latency.max} ms`);
+        console.log(`Throughput:     ${(result.throughput.average / 1024).toFixed(2)} KB/s`);
+        console.log(`Non-2xx:        ${result.non2xx}`);
+        console.log('----------------------------------\n');
     });
 
-    // Capture Ctrl+C to stop gracefully
-    process.on('SIGINT', () => {
-        instance.stop();
-    });
-
+    process.on('SIGINT', () => instance.stop());
     autocannon.track(instance, { renderProgressBar: true });
 }
-
 runTest();

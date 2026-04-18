@@ -1,3 +1,4 @@
+import { monitorEventLoopDelay } from "perf_hooks";
 import { createApp } from "./app.js";
 import { config } from "./config/config.js";
 import { DataBaseConfig } from "./config/db/index.js";
@@ -23,9 +24,18 @@ const startServer = async (): Promise<void> => {
         // 4. Start background consumers
         await startConsumers();
 
+
+        const h = monitorEventLoopDelay({ resolution: 10 });
+        h.enable();
+
+        setInterval(() => {
+            console.log(`ELD — mean: ${(h.mean / 1e6).toFixed(2)}ms, max: ${(h.max / 1e6).toFixed(2)}ms`);
+            h.reset();
+        }, 5000);
+
         // 5. Start Express server
         app.listen(config.port, () => {
-            log.debug(`Server is running on port ${config.port}`, { env: config.NODE_ENV });
+            log.info(`Server is running on port ${config.port}`, { env: config.NODE_ENV });
         });
 
         // ------ Graceful Shutdown ------

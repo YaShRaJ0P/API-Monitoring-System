@@ -50,9 +50,17 @@ export class IngestionController {
             if (!validationResult.success) {
                 return response(res, 400, "Validation failed", validationResult.error);
             }
+            const t0 = Date.now();
+
+            // after auth middleware (already done by here)
+            const t1 = Date.now();
 
             const result = await this.ingestionService.ingestData(validationResult.data);
+            const t2 = Date.now();
 
+            log.debug(`auth: ${t1 - t0}ms | ingest: ${t2 - t1}ms | total: ${t2 - t0}ms`);
+
+            
             if (result.buffered) {
                 // 202 Accepted - the circuit breaker is open; event is safely buffered in Redis
                 return response(res, 202, "Event accepted and buffered for processing", null);

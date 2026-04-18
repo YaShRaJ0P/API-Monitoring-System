@@ -84,7 +84,7 @@ export const config = {
         },
         outbox: {
             pollIntervalMs: 5000,
-            batchSize: 100,
+            batchSize: 25,
             maxRetries: 3,
         },
         minuteMetrics: {

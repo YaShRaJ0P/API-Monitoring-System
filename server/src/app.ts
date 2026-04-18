@@ -16,14 +16,14 @@ import { AdminRoutes } from "./modules/admin/admin.route.js"
 import configurePassport from "./modules/auth/passport.js"
 import { AuthRepository } from "./modules/auth/auth.repository.js"
 import { AuthService } from "./modules/auth/auth.service.js"
-import { DataBaseConfig, MongoDB, PostgreSQL, Redis } from "./config/db/index.js"
+import { DataBaseConfig, MongoDB, PostgreSQL, RedisDB } from "./config/db/index.js"
 import { RabbitMQ } from "./config/rabbitmq.js"
 import { errorMiddleware } from "./shared/middleware/error.middleware.js"
 import { authMiddleware } from "./shared/middleware/auth.middleware.js"
 import { isAdminMiddleware } from "./shared/middleware/isAdmin.middleware.js"
-import { apiKeyMiddleware } from "./shared/middleware/apiKey.middleware.js"
+import { apiKeyGuard } from "./shared/middleware/apiKey.middleware.js"
 import { globalLimiter } from "./shared/middleware/rateLimiter.middleware.js"
-import { apiKeyLimiter } from "./shared/middleware/apiKeyRateLimit.middleware.js"
+// import { apiKeyLimiter } from "./shared/middleware/apiKeyRateLimit.middleware.js"
 
 /**
  * Creates and configures the Express application.
@@ -85,7 +85,7 @@ export function createApp() {
         if (checks.mongo !== "connected") allHealthy = false;
 
         // Redis
-        checks.redis = Redis.getStatus();
+        checks.redis = RedisDB.getStatus();
         if (checks.redis !== "connected") allHealthy = false;
 
         // RabbitMQ
@@ -111,7 +111,7 @@ export function createApp() {
 
     // ------ Protected routes ------
     app.use(config.api.prefix + "/" + config.api.version + "/tenant", authMiddleware, TenantRoutes({ postgresPool: pool }))
-    app.use(config.api.prefix + "/" + config.api.version + "/ingest", apiKeyMiddleware, apiKeyLimiter, IngestionRouter())
+    app.use(config.api.prefix + "/" + config.api.version + "/ingest", apiKeyGuard, IngestionRouter())
     app.use(config.api.prefix + "/" + config.api.version + "/metrics", authMiddleware, MetricsRoutes({ postgresPool: pool }))
     app.use(config.api.prefix + "/" + config.api.version + "/alerts", authMiddleware, AlertRoutes())
     app.use(config.api.prefix + "/" + config.api.version + "/admin/dlq", authMiddleware, isAdminMiddleware, DLQRoutes({ postgresPool: pool }))
